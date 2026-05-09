@@ -24,6 +24,13 @@ from vsdx.connection_points import (
     ConnectionPoints,
 )
 from vsdx.data_graphics import DataGraphic, DataGraphicItem, DataGraphics
+from vsdx.data_recordsets import (
+    DataBinding,
+    DataColumn,
+    DataRecordset,
+    DataRecordsets,
+    DataRow,
+)
 from vsdx.constants import (
     CT_VSDX_DRAWING_MAIN,
     CT_VSDX_MACRO_DRAWING_MAIN,
@@ -118,9 +125,14 @@ __all__ = [
     "ConnectionPoint",
     "ConnectionPoints",
     "Connector",
+    "DataBinding",
+    "DataColumn",
     "DataGraphic",
     "DataGraphicItem",
     "DataGraphics",
+    "DataRecordset",
+    "DataRecordsets",
+    "DataRow",
     "Ellipse",
     "EllipticalArcTo",
     "Emu",

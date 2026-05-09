@@ -35,6 +35,7 @@ from ooxml_opc import OpcPackage, Part, PartFactory
 
 from vsdx.constants import (
     CT_VBA_PROJECT,
+    CT_VSDX_DATARECORDSETS,
     CT_VSDX_DRAWING_MAIN,
     CT_VSDX_MACRO_DRAWING_MAIN,
     CT_VSDX_MACRO_STENCIL_MAIN,
@@ -55,6 +56,7 @@ from vsdx.constants import (
     VSDX_KIND_STENCIL,
     VSDX_KIND_TEMPLATE,
 )
+from vsdx.parts.datarecordsets import DataRecordsetsPart
 from vsdx.parts.document import VisioDocumentPart
 from vsdx.parts.master import MasterPart, MastersPart
 from vsdx.parts.page import PagePart, PagesPart
@@ -98,6 +100,9 @@ VISIO_PART_TYPE_MAP: dict[str, type[Part]] = {
     # -- VBA project (opaque blob, macro-enabled variants only) --
     # .. versionadded:: 0.2.0
     CT_VBA_PROJECT: VbaProjectPart,
+    # -- data recordsets (external-data binding) --
+    # .. versionadded:: 0.2.0
+    CT_VSDX_DATARECORDSETS: DataRecordsetsPart,
 }
 
 

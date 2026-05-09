@@ -333,6 +333,31 @@ class Shape(ParentedElementProxy):
             )
         _set_shape_data_graphic_id(self._element, value.id)
 
+    # -- data-recordset bindings ----------------------------------------
+
+    @property
+    def data_bindings(self):
+        """The shape's :class:`~vsdx.data_recordsets.DataBinding` proxies.
+
+        List-like over every ``<DataBinding Recordset="n" Row="m"/>``
+        child of this shape. Each binding resolves to a row in one of
+        the document's :attr:`~vsdx.document.VisioDocument.data_
+        recordsets`, exposing the linked ``DataRecordset`` / ``DataRow``
+        and a read-only column-name → value dict.
+
+        Read-only in 0.2.0 — returns an empty list when the shape has
+        no bindings (the common case) or when the owning document
+        cannot be resolved (unit-test oxml fixtures).
+
+        .. versionadded:: 0.2.0
+        """
+        from vsdx.data_recordsets import _shape_data_bindings
+
+        document = self._owning_document()
+        if document is None:
+            return []
+        return _shape_data_bindings(self, document)
+
     def _owning_document(self):
         """Walk up the proxy tree to the :class:`VisioDocument` that owns
         this shape. Returns ``None`` when the shape was constructed

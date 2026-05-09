@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import IO, TYPE_CHECKING, Optional, Union, cast
 
 from vsdx.data_graphics import DataGraphics
+from vsdx.data_recordsets import DataRecordsets
 from vsdx.master import Masters
 from vsdx.page import Pages
 from vsdx.shared import PartElementProxy
@@ -60,6 +61,25 @@ class VisioDocument(PartElementProxy):
         .. versionadded:: 0.2.0
         """
         return DataGraphics(self)
+
+    @lazyproperty
+    def data_recordsets(self) -> DataRecordsets:
+        """The :class:`~vsdx.data_recordsets.DataRecordsets` collection.
+
+        Lazy list over every ``/visio/datarecordsets/datarecordset%d.xml``
+        part in the package (content-type
+        ``application/vnd.ms-visio.dataRecordSets+xml``). Author-from-
+        scratch packages carry zero recordsets; real Visio drawings that
+        have imported external data carry one part per bound source
+        (ODBC query, Excel range, SharePoint list).
+
+        Read-only in 0.2.0 — authoring (``add_data_recordset`` /
+        ``shape.add_data_binding``) is deferred. See
+        :mod:`vsdx.data_recordsets`.
+
+        .. versionadded:: 0.2.0
+        """
+        return DataRecordsets(self)
 
     # -- hyperlink base --------------------------------------------------
 
