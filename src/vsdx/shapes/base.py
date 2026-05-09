@@ -20,6 +20,7 @@ from vsdx.text import TextFrame
 from vsdx.util import Inches, Length
 
 if TYPE_CHECKING:
+    from vsdx.geometry import Geometries, Geometry
     from vsdx.oxml._stubs import CT_Cell, CT_Shape  # TODO(vsdx/track-1)
     from vsdx.shapes.shapetree import ShapeTree
 
@@ -262,6 +263,58 @@ class Shape(ParentedElementProxy):
 
         indices = [layer.index for layer in layers]
         _set_shape_layer_indices(self._element, indices)
+
+    # -- custom geometry ------------------------------------------------
+
+    @property
+    def geometries(self) -> "Geometries":
+        """The shape's :class:`~vsdx.geometry.Geometries` collection.
+
+        Yields one :class:`~vsdx.geometry.Geometry` proxy per
+        ``<Section N="Geometry">`` on the shape, in ``@IX`` order.
+        Shapes without any Geometry sections expose an empty
+        collection (``len(shape.geometries) == 0``).
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.geometry import Geometries
+
+        return Geometries(self)
+
+    @property
+    def geometry(self) -> "Optional[Geometry]":
+        """The shape's first Geometry section, or ``None``.
+
+        Convenience shortcut for ``shape.geometries[0]`` when the
+        caller only cares about the primary path. Returns ``None`` on
+        shapes without any geometry sections — callers should consult
+        :attr:`geometries` when they need to handle compound paths.
+
+        .. versionadded:: 0.3.0
+        """
+        geometries = self.geometries
+        if len(geometries) == 0:
+            return None
+        return geometries[0]
+
+    def add_geometry(
+        self,
+        *,
+        no_fill: bool = False,
+        no_line: bool = False,
+        no_show: bool = False,
+    ) -> "Geometry":
+        """Append a new :class:`~vsdx.geometry.Geometry` path and return it.
+
+        Shortcut for ``shape.geometries.add(...)``. Flag-cell defaults
+        match Visio desktop's "new path" dialog (all false → paint
+        the path as both fill and stroke).
+
+        .. versionadded:: 0.3.0
+        """
+        return self.geometries.add(
+            no_fill=no_fill, no_line=no_line, no_show=no_show
+        )
 
     # -- helpers --------------------------------------------------------
 

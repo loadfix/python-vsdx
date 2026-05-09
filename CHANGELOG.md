@@ -6,6 +6,55 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — custom geometry (R4-12, scoping §4.3 / §4.4)
+
+- **`vsdx.geometry.Geometry`** and **`vsdx.geometry.Geometries`** —
+  proxies over one and many ``<Section N="Geometry" IX="N">`` sections
+  on a ``<Shape>``. Shapes may carry several geometry sections for
+  compound paths (fill + outline + cut-paths); ``Geometries`` iterates
+  them in ``@IX`` order.
+- **`Shape.geometry`** / **`Shape.geometries`** / **`Shape.add_geometry`** —
+  accessors for the shape's primary path, full collection, and new-path
+  factory respectively.
+- **Row-type proxies** — `MoveTo`, `LineTo`, `ArcTo`,
+  `EllipticalArcTo`, `NURBSTo`, `PolylineTo`, `SplineStart`,
+  `SplineKnot`, `InfiniteLine`, `Ellipse`, `RelMoveTo`, `RelLineTo`,
+  `RelCubBezTo`, `RelQuadBezTo`, `RelEllipticalArcTo`. Each is a
+  thin wrapper over the underlying ``<Row T="…">`` element exposing
+  typed cell accessors (``.x`` / ``.y`` / ``.a`` / ``.b`` / ``.c`` /
+  ``.d`` / ``.e``) and :meth:`GeometryRow.set_formula` /
+  :meth:`GeometryRow.get_formula` escape hatches for ``Cell/@F``
+  overrides. `ArcTo.bow` is an alias for `ArcTo.a` matching the
+  Visio docs' terminology.
+- **`UnknownGeometryRow`** — fallback proxy for row types this
+  module hasn't specialised; preserves the ``@T`` discriminator
+  verbatim so parse-modify-save never drops rows.
+- **Builder API** — ``geometry.move_to(x, y)``, ``.line_to(x, y)``,
+  ``.arc_to(x, y, bow)``, ``.elliptical_arc_to(x, y, a, b, c, d)``,
+  ``.nurbs_to(x, y, a, b, c, d, e=None)``, ``.spline_start``,
+  ``.spline_knot``, ``.polyline_to``, ``.infinite_line``,
+  ``.ellipse``, and the matching ``.rel_*`` variants. Each method
+  returns the newly appended row proxy for chaining.
+- **`Geometry.rows`** — ``list[GeometryRow]`` read accessor ordered
+  by ``@IX``.
+- **Section-level flag cells** — `Geometry.no_fill` / `.no_line` /
+  `.no_show` / `.no_snap` / `.no_quick_drag` round-trip the direct
+  ``<Cell>`` flag children every Visio Geometry section carries.
+- **`Geometry.remove_row(row)`** / **`Geometries.remove(geometry)`** —
+  path-level and section-level mutation. Unlike `Layers.remove`, no
+  ``@IX`` renumbering happens — Visio orders geometry rows by
+  document order, not by index, so gaps are tolerated and untouched
+  rows preserve byte-identity.
+
+### Tests
+
+- **26 geometry unit tests** (`tests/unit/test_geometry.py`): builder
+  API (square, arc, elliptical arc, NURBS, spline, polyline, relative
+  variants), row-type dispatch (all 13 known types + unknown-type
+  fallback), flag-cell round-trip, coordinate / formula setters,
+  fixture-shaped parse, build → serialise → re-parse round-trip, and
+  row / section removal.
+
 ## [0.2.0] — 2026-05-09
 
 Implements `audits/2026-05-09-vsdx-0.2-scoping.md`. Seven scoping-doc
