@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<Master xmlns="http://schemas.microsoft.com/office/visio/2012/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ID="8" NameU="Triangle" IsCustomNameU="1" Name="Triangle" IsCustomName="1" Prompt="Drag onto the page, then use the yellow squares to modify the shape." IconSize="1" AlignName="2" MatchByName="0" IconUpdate="1" UniqueID="{08847AF5-0007-0000-8E40-00608CF305B2}" BaseID="{15B9AEF4-CD22-49F4-A3F5-28ED62BB42CB}" PatternFlags="0" Hidden="0" MasterType="2">
+  <PageSheet LineStyle="0" FillStyle="0" TextStyle="0">
+    <Cell N="PageWidth" V="4" U="IN"/>
+    <Cell N="PageHeight" V="4" U="IN"/>
+    <Cell N="ShdwOffsetX" V="0.125"/>
+    <Cell N="ShdwOffsetY" V="-0.125"/>
+    <Cell N="PageScale" V="1" U="IN"/>
+    <Cell N="DrawingScale" V="1" U="IN"/>
+    <Cell N="DrawingSizeType" V="0"/>
+    <Cell N="DrawingScaleType" V="0"/>
+    <Cell N="InhibitSnap" V="0"/>
+    <Cell N="PageLockReplace" V="0" U="BOOL"/>
+    <Cell N="PageLockDuplicate" V="0" U="BOOL"/>
+    <Cell N="UIVisibility" V="0"/>
+    <Cell N="ShdwType" V="0"/>
+    <Cell N="ShdwObliqueAngle" V="0"/>
+    <Cell N="ShdwScaleFactor" V="1"/>
+    <Cell N="DrawingResizeType" V="1"/>
+    <Cell N="ShapeKeywords" V="basic,shape,geometry,polygon,three-sided,3-sided,figure,isosceles,equilateral,oblique,obtuse,acute,Pythagorean,theorem,trigonometry"/>
+  </PageSheet>
+  <Icon>
+AAABAAEAICAQAAAAAADoAgAAFgAAACgAAAAgAAAAQAAAAAEABAAAAAAAgAIAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAACAAACAAAAAgIAAgAAAAIAAgACAgAAAgICAAMDAwAAAAP8AAP8AAAD//wD/AAAA/w
+D/AP//AAD///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAHd3d3d3d3d3d3d3d3d3AAB/////////////////+AAACP////////////////AAAAD/////////
+//////9wAAAAj///////////////AAAAAA//////////////8AAAAAAA/////////////4AAAAAAA
+P////////////8AAAAAAAB////////////wAAAAAAAACP//////////8AAAAAAAAAD//////////3
+AAAAAAAAAAj/////////gAAAAAAAAAAA/////////wAAAAAAAAAAAH////////gAAAAAAAAAAAAP/
+//////wAAAAAAAAAAAAAP//////cAAAAAAAAAAAAACP/////wAAAAAAAAAAAAAAD/////AAAAAAAA
+AAAAAAAAj///+AAAAAAAAAAAAAAAAA////AAAAAAAAAAAAAAAAAH//+AAAAAAAAAAAAAAAAAAP//A
+AAAAAAAAAAAAAAAAAAP9wAAAAAAAAAAAAAAAAAACPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAD///////////////+AAAABwAAAA8AAAAPwAAAH8AAAB/AAAB/8AAAP+AAAH/wAAH/8AAA//gAA
+f/8AAH//AAD//4AB//+AAf//4AP//8AD///gD///8Af///AP///4H///+B////4////8P////v///
+/9//////////////////w==</Icon>
+  <Rel r:id="rId3"/>
+</Master>

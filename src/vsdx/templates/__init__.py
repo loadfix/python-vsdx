@@ -5,16 +5,18 @@ Two kinds of asset live here:
 - ``default.vsdx`` — a minimal Visio-authored empty document used as the
   base package when :class:`vsdx.api.Visio` is called with no args. The
   file is produced by Microsoft Visio desktop and copied in verbatim.
-- ``fragments/*.xml`` — per-master ``<Master>`` / ``<MasterContents>``
-  XML fragments extracted from Visio-authored source fixtures
-  (Rectangle, Ellipse, Triangle, Dynamic Connector). These splice into
-  a package when the proxy layer instantiates a shape from a built-in
-  master without having to open the source ``.vsdx`` every time.
+- ``fragments/<slug>.master.xml`` + ``fragments/<slug>.masterContents.xml``
+  — per-master ``<Master>`` / ``<MasterContents>`` XML fragments
+  extracted from Visio-authored source fixtures (Rectangle, Ellipse,
+  Triangle, Dynamic Connector). These splice into a package when the
+  proxy layer instantiates a shape from a built-in master without
+  having to open the source ``.vsdx`` every time.
 
-Both asset kinds are populated from the Microsoft Visio-produced
-fixtures requested in ``/tmp/vsdx-fixture-requests.md``. Until those
-land, the runtime helpers here raise :class:`TemplateNotAvailable` with
-an actionable message pointing at that request file.
+:func:`master_fragment_path` returns the path to the ``<Master>``
+entry file (``<slug>.master.xml``). The companion
+``<slug>.masterContents.xml`` lives alongside it with predictable
+naming; callers splicing the master part into a package read that
+second file with the same stem and a ``.masterContents.xml`` suffix.
 
 The legality of shipping Visio-authored default content follows the
 same rationale python-pptx uses for ``default-16x9.pptx`` — it's a
@@ -39,10 +41,10 @@ class TemplateNotAvailable(FileNotFoundError):
 
 
 _MASTER_FRAGMENTS = {
-    "Rectangle": "rectangle.xml",
-    "Ellipse": "ellipse.xml",
-    "Triangle": "triangle.xml",
-    "Dynamic Connector": "dynamic-connector.xml",
+    "Rectangle": "rectangle.master.xml",
+    "Ellipse": "ellipse.master.xml",
+    "Triangle": "triangle.master.xml",
+    "Dynamic Connector": "dynamic-connector.master.xml",
 }
 
 
@@ -65,12 +67,15 @@ def default_template_path() -> Path:
 
 
 def master_fragment_path(master_name: str) -> Path:
-    """Return the on-disk path to a per-master XML fragment.
+    """Return the on-disk path to a per-master ``<Master>`` XML fragment.
 
     ``master_name`` is the Visio ``NameU`` attribute of the master
-    (e.g. ``"Rectangle"``, ``"Dynamic Connector"``). Raises
-    :class:`KeyError` for unknown masters, :class:`TemplateNotAvailable`
-    for known masters whose fragment hasn't been extracted yet.
+    (e.g. ``"Rectangle"``, ``"Dynamic Connector"``). The returned path
+    points at ``<slug>.master.xml``; the companion
+    ``<slug>.masterContents.xml`` lives in the same directory with the
+    same stem. Raises :class:`KeyError` for unknown masters, and
+    :class:`TemplateNotAvailable` if a known master's fragment is
+    missing from disk (e.g. a packaging bug).
     """
     if master_name not in _MASTER_FRAGMENTS:
         raise KeyError(
@@ -83,10 +88,9 @@ def master_fragment_path(master_name: str) -> Path:
     path = Path(str(target))
     if not path.exists():
         raise TemplateNotAvailable(
-            f"fragment for {master_name!r} not bundled yet — see "
-            f"/tmp/vsdx-fixture-requests.md (the "
-            f"``{master_name.lower().replace(' ', '-')}-master.office.vsdx`` "
-            f"entry)."
+            f"fragment for {master_name!r} expected at {path} but not "
+            "found — the bundled assets appear to be missing from this "
+            "install."
         )
     return path
 

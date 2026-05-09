@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<Master xmlns="http://schemas.microsoft.com/office/visio/2012/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ID="6" NameU="Ellipse" IsCustomNameU="1" Name="Ellipse" IsCustomName="1" Prompt="Drag onto the page." IconSize="1" AlignName="2" MatchByName="0" IconUpdate="1" UniqueID="{08847960-0005-0000-8E40-00608CF305B2}" BaseID="{856E26FB-127B-4E9F-AB4A-9B7080433C0D}" PatternFlags="0" Hidden="0" MasterType="2">
+  <PageSheet LineStyle="0" FillStyle="0" TextStyle="0">
+    <Cell N="PageWidth" V="4" U="IN"/>
+    <Cell N="PageHeight" V="4" U="IN"/>
+    <Cell N="ShdwOffsetX" V="0.125"/>
+    <Cell N="ShdwOffsetY" V="-0.125"/>
+    <Cell N="PageScale" V="1" U="IN"/>
+    <Cell N="DrawingScale" V="1" U="IN"/>
+    <Cell N="DrawingSizeType" V="0"/>
+    <Cell N="DrawingScaleType" V="0"/>
+    <Cell N="InhibitSnap" V="0"/>
+    <Cell N="PageLockReplace" V="0" U="BOOL"/>
+    <Cell N="PageLockDuplicate" V="0" U="BOOL"/>
+    <Cell N="UIVisibility" V="0"/>
+    <Cell N="ShdwType" V="0"/>
+    <Cell N="ShdwObliqueAngle" V="0"/>
+    <Cell N="ShdwScaleFactor" V="1"/>
+    <Cell N="DrawingResizeType" V="1"/>
+    <Cell N="ShapeKeywords" V="basic,shape,geometry,circular,round,curve,oval"/>
+  </PageSheet>
+  <Icon>
+AAABAAEAICAQAAAAAADoAgAAFgAAACgAAAAgAAAAQAAAAAEABAAAAAAAgAIAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAACAAACAAAAAgIAAgAAAAIAAgACAgAAAgICAAMDAwAAAAP8AAP8AAAD//wD/AAAA/w
+D/AP//AAD///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB3d3
+cAAAAAAAAAAAAAAI////////gAAAAAAAAAAI///////////wAAAAAAAI/////////////4AAAAAAj
+///////////////AAAACP////////////////AAAH/////////////////4AAD///////////////
+///wAA//////////////////8AAP//////////////////cAD//////////////////3AA///////
+///////////8AAI//////////////////AAAP////////////////9wAAAP///////////////4AA
+AAAP//////////////gAAAAAAP////////////9wAAAAAAAH//////////9wAAAAAAAAAACI/////
+4gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAD/////////////////////////////////yBP//gAAf/wAAF/wAAAP4AAAB8AAAAPAAAADgAAA
+AYAAAAPAAAABgAAAAYAAAAOAAAAB4AAAA/AAAAP4AAAH/AAAD/wAAD//QAL//+AH/////////////
+////////////////////w==</Icon>
+  <Rel r:id="rId2"/>
+</Master>
