@@ -28,14 +28,17 @@ part-plus-children layout).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Optional, cast
 
 from ooxml_opc import CONTENT_TYPE as CT
 from ooxml_opc import OpcPackage, Part, PartFactory
 
 from vsdx.constants import (
+    CT_VBA_PROJECT,
     CT_VSDX_DRAWING_MAIN,
     CT_VSDX_MACRO_DRAWING_MAIN,
+    CT_VSDX_MACRO_STENCIL_MAIN,
+    CT_VSDX_MACRO_TEMPLATE_MAIN,
     CT_VSDX_MASTER,
     CT_VSDX_MASTERS,
     CT_VSDX_PAGE,
@@ -43,16 +46,21 @@ from vsdx.constants import (
     CT_VSDX_STENCIL_MAIN,
     CT_VSDX_TEMPLATE_MAIN,
     CT_VSDX_WINDOWS,
+    RT_VBA_PROJECT,
     RT_VISIO_DOCUMENT,
     RT_VISIO_MASTERS,
     RT_VISIO_PAGES,
     RT_VISIO_WINDOWS,
+    VSDX_KIND_DRAWING,
+    VSDX_KIND_STENCIL,
+    VSDX_KIND_TEMPLATE,
 )
 from vsdx.parts.document import VisioDocumentPart
 from vsdx.parts.master import MasterPart, MastersPart
 from vsdx.parts.page import PagePart, PagesPart
 from vsdx.parts.stencil import StencilPart
 from vsdx.parts.theme import ThemePart
+from vsdx.parts.vba import VbaProjectPart
 from vsdx.parts.windows import WindowsPart
 
 if TYPE_CHECKING:
@@ -71,11 +79,13 @@ __all__ = [
 #: :func:`register_visio_parts` at import time so the shared loader
 #: minted the correct subclass when encountering a Visio part.
 VISIO_PART_TYPE_MAP: dict[str, type[Part]] = {
-    # -- Visio root variants: drawing, macro-drawing, template, stencil --
+    # -- Visio root variants: drawing / template / stencil + macro twins --
     CT_VSDX_DRAWING_MAIN: VisioDocumentPart,
     CT_VSDX_MACRO_DRAWING_MAIN: VisioDocumentPart,
     CT_VSDX_TEMPLATE_MAIN: VisioDocumentPart,
+    CT_VSDX_MACRO_TEMPLATE_MAIN: VisioDocumentPart,
     CT_VSDX_STENCIL_MAIN: StencilPart,
+    CT_VSDX_MACRO_STENCIL_MAIN: StencilPart,
     # -- pages + masters: index + per-entry --
     CT_VSDX_PAGES: PagesPart,
     CT_VSDX_PAGE: PagePart,
@@ -85,6 +95,9 @@ VISIO_PART_TYPE_MAP: dict[str, type[Part]] = {
     CT_VSDX_WINDOWS: WindowsPart,
     # -- shared theme (DrawingML) --
     CT.OFC_THEME: ThemePart,
+    # -- VBA project (opaque blob, macro-enabled variants only) --
+    # .. versionadded:: 0.2.0
+    CT_VBA_PROJECT: VbaProjectPart,
 }
 
 
@@ -128,32 +141,51 @@ class VisioPackage(OpcPackage):
     # ------------------------------------------------------------------
 
     @classmethod
-    def new(cls) -> Self:
+    def new(cls, kind: str = VSDX_KIND_DRAWING) -> Self:
         """Return a new, empty :class:`VisioPackage` ready for authoring.
 
         Wires up the minimum part graph Microsoft Visio expects:
 
-        - :class:`VisioDocumentPart` at ``/visio/document.xml`` related
-          from the package root via ``RT_VISIO_DOCUMENT``.
+        - :class:`VisioDocumentPart` (drawing/template) or
+          :class:`StencilPart` (stencil) at ``/visio/document.xml``
+          related from the package root via ``RT_VISIO_DOCUMENT``.
         - Empty :class:`PagesPart` at ``/visio/pages/pages.xml``
           related from the document part via ``RT_VISIO_PAGES``.
+          *Not wired for stencils* — stencils legitimately have no
+          ``<Pages>`` (scoping doc §3.4).
         - Empty :class:`MastersPart` at ``/visio/masters/masters.xml``
           related from the document part via ``RT_VISIO_MASTERS``.
         - Empty :class:`WindowsPart` at ``/visio/windows.xml`` related
           from the document part via ``RT_VISIO_WINDOWS``.
 
         Theme and docProps parts are deliberately *not* seeded here —
-        :mod:`vsdx.templates` (track 4) is responsible for injecting
-        the seed-template theme + docProps via ``default.vsdx``. This
-        keeps the parts-layer factory independent of the template
-        bundle's timing.
+        :mod:`vsdx.templates` is responsible for injecting the
+        seed-template theme + docProps via ``default.vsdx``.
+
+        :param kind: One of ``"drawing"`` / ``"stencil"`` / ``"template"``.
+            Drawings and templates share the same parts graph and the
+            same root part class (:class:`VisioDocumentPart`) — the
+            only diff is the root content-type. Stencils substitute a
+            :class:`StencilPart` root and omit the ``PagesPart``.
+
+        .. versionchanged:: 0.2.0
+            Added the *kind* parameter. Previous (0.1.0) callers that
+            passed no argument still get a drawing.
         """
         package = cls()
-        document_part = VisioDocumentPart.new(package)
+        if kind == VSDX_KIND_DRAWING:
+            document_part = VisioDocumentPart.new(package)
+        elif kind == VSDX_KIND_TEMPLATE:
+            document_part = VisioDocumentPart.new_template(package)
+        elif kind == VSDX_KIND_STENCIL:
+            document_part = StencilPart.new(package)
+        else:
+            raise ValueError("unknown VisioPackage kind: %r" % kind)
         package.relate_to(document_part, RT_VISIO_DOCUMENT)
 
-        pages_part = PagesPart.new(package)
-        document_part.relate_to(pages_part, RT_VISIO_PAGES)
+        if kind != VSDX_KIND_STENCIL:
+            pages_part = PagesPart.new(package)
+            document_part.relate_to(pages_part, RT_VISIO_PAGES)
 
         masters_part = MastersPart.new(package)
         document_part.relate_to(masters_part, RT_VISIO_MASTERS)
@@ -162,6 +194,64 @@ class VisioPackage(OpcPackage):
         document_part.relate_to(windows_part, RT_VISIO_WINDOWS)
 
         return package
+
+    # ------------------------------------------------------------------
+    # Kind / macro discrimination
+    # ------------------------------------------------------------------
+
+    @property
+    def kind(self) -> str:
+        """Which of ``"drawing"`` / ``"stencil"`` / ``"template"`` this is.
+
+        Dispatches on the root document-part content-type.
+
+        .. versionadded:: 0.2.0
+        """
+        ct = self.main_document_part.content_type
+        if ct in (CT_VSDX_DRAWING_MAIN, CT_VSDX_MACRO_DRAWING_MAIN):
+            return VSDX_KIND_DRAWING
+        if ct in (CT_VSDX_STENCIL_MAIN, CT_VSDX_MACRO_STENCIL_MAIN):
+            return VSDX_KIND_STENCIL
+        if ct in (CT_VSDX_TEMPLATE_MAIN, CT_VSDX_MACRO_TEMPLATE_MAIN):
+            return VSDX_KIND_TEMPLATE
+        raise ValueError(
+            "unrecognised Visio root content-type %r" % ct
+        )
+
+    @property
+    def is_macro_enabled(self) -> bool:
+        """``True`` when this package carries a ``vbaProject.bin`` part.
+
+        Macro-enabled variants (``.vsdm`` / ``.vssm`` / ``.vstm``) are
+        discriminated purely by the root content-type override (there
+        is no schema difference). This property surfaces that
+        distinction for UIs that need to warn the user before stripping
+        macros on a save-as to a non-macro variant.
+
+        .. versionadded:: 0.2.0
+        """
+        document_part = self.main_document_part
+        for rel in document_part.rels.values():
+            if rel.is_external:
+                continue
+            if rel.reltype == RT_VBA_PROJECT:
+                return True
+        return False
+
+    @property
+    def vba_project_part(self) -> "Optional[VbaProjectPart]":  # noqa: F821
+        """The :class:`~vsdx.parts.vba.VbaProjectPart` or ``None``.
+
+        .. versionadded:: 0.2.0
+        """
+        document_part = self.main_document_part
+        for rel in document_part.rels.values():
+            if rel.is_external or rel.reltype != RT_VBA_PROJECT:
+                continue
+            target = rel.target_part
+            if isinstance(target, VbaProjectPart):
+                return target
+        return None
 
     # ------------------------------------------------------------------
     # Well-known part accessors

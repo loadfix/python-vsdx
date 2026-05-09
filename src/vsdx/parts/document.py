@@ -22,7 +22,7 @@ from ooxml_opc import RELATIONSHIP_TYPE as RT
 from ooxml_opc import XmlPart
 from ooxml_opc.packuri import PackURI
 
-from vsdx.constants import CT_VSDX_DRAWING_MAIN
+from vsdx.constants import CT_VSDX_DRAWING_MAIN, CT_VSDX_TEMPLATE_MAIN
 from vsdx.oxml import parse_xml
 from vsdx.parts._templates import DEFAULT_DOCUMENT_XML
 from vsdx.parts.theme import ThemePart
@@ -45,15 +45,31 @@ class VisioDocumentPart(XmlPart):
         """Return a new, empty document part seeded with a bare
         ``<VisioDocument/>`` root.
 
-        Used when constructing a package from scratch. Track 1's
-        ``CT_VisioDocument.new_default()`` will replace this default
-        blob in a follow-up; for 0.1.0 the oxml layer is expected to
-        hydrate children on first write.
+        Used when constructing a package from scratch. The oxml layer
+        hydrates children on first write.
         """
         element = parse_xml(DEFAULT_DOCUMENT_XML)
         return cls(
             PackURI("/visio/document.xml"),
             CT_VSDX_DRAWING_MAIN,
+            package,
+            element,
+        )
+
+    @classmethod
+    def new_template(cls, package: OpcPackage) -> VisioDocumentPart:
+        """Return a new, empty **template** document part.
+
+        Identical to :meth:`new` except the content-type override is
+        ``application/vnd.ms-visio.template.main+xml`` — the XML
+        payload is unchanged (scoping doc §6.3).
+
+        .. versionadded:: 0.2.0
+        """
+        element = parse_xml(DEFAULT_DOCUMENT_XML)
+        return cls(
+            PackURI("/visio/document.xml"),
+            CT_VSDX_TEMPLATE_MAIN,
             package,
             element,
         )
