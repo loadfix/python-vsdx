@@ -12,7 +12,8 @@ stores everything on a generic cell element distinguished by its
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+import logging
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from vsdx.enum.cells import ST_Unit
 from vsdx.shared import ParentedElementProxy
@@ -23,9 +24,13 @@ if TYPE_CHECKING:
     from vsdx.connection_points import ConnectionPoints
     from vsdx.geometry import Geometries, Geometry
     from vsdx.hyperlinks import HyperlinkCollection
+    from vsdx.master import Master
     from vsdx.oxml._stubs import CT_Cell, CT_Shape  # TODO(vsdx/track-1)
     from vsdx.shape_data import ShapeData
     from vsdx.shapes.shapetree import ShapeTree
+
+
+_log = logging.getLogger(__name__)
 
 
 # Named-cell accessor helpers ------------------------------------------------
@@ -114,11 +119,23 @@ class Shape(ParentedElementProxy):
         return self._element.get("Type")
 
     # -- position & size (all in inches via Length) ---------------------
+    #
+    # Getters walk the master-chain via :meth:`effective_prop` so an
+    # instance shape that omits (say) ``<Cell N="Width">`` inherits the
+    # value from its master's first shape (or a chained ancestor). See
+    # :meth:`master_chain` for the walk order. Setters write the cell
+    # directly on the instance — instance-level overrides always win
+    # the resolver race against any master value.
 
     @property
     def pin_x(self) -> Length:
-        """Pin X — horizontal location of the shape's pin, in inches."""
-        return Inches(_cell_float(self._element, "PinX") or 0.0)
+        """Pin X — horizontal location of the shape's pin, in inches.
+
+        Falls back to the master-chain value when the instance has no
+        ``<Cell N="PinX">`` of its own. Returns ``Inches(0.0)`` when
+        unresolved.
+        """
+        return Inches(self._effective_cell_float("PinX") or 0.0)
 
     @pin_x.setter
     def pin_x(self, value: Any) -> None:
@@ -126,7 +143,7 @@ class Shape(ParentedElementProxy):
 
     @property
     def pin_y(self) -> Length:
-        return Inches(_cell_float(self._element, "PinY") or 0.0)
+        return Inches(self._effective_cell_float("PinY") or 0.0)
 
     @pin_y.setter
     def pin_y(self, value: Any) -> None:
@@ -134,7 +151,7 @@ class Shape(ParentedElementProxy):
 
     @property
     def width(self) -> Length:
-        return Inches(_cell_float(self._element, "Width") or 0.0)
+        return Inches(self._effective_cell_float("Width") or 0.0)
 
     @width.setter
     def width(self, value: Any) -> None:
@@ -142,7 +159,7 @@ class Shape(ParentedElementProxy):
 
     @property
     def height(self) -> Length:
-        return Inches(_cell_float(self._element, "Height") or 0.0)
+        return Inches(self._effective_cell_float("Height") or 0.0)
 
     @height.setter
     def height(self, value: Any) -> None:
@@ -150,8 +167,12 @@ class Shape(ParentedElementProxy):
 
     @property
     def angle(self) -> float:
-        """Rotation angle in radians (Visio's native unit for Angle)."""
-        return _cell_float(self._element, "Angle") or 0.0
+        """Rotation angle in radians (Visio's native unit for Angle).
+
+        Falls back to the master-chain value when the instance has no
+        ``<Cell N="Angle">`` of its own.
+        """
+        return self._effective_cell_float("Angle") or 0.0
 
     @angle.setter
     def angle(self, value: float) -> None:
@@ -449,6 +470,133 @@ class Shape(ParentedElementProxy):
         from vsdx.connection_points import ConnectionPoints
 
         return ConnectionPoints(self)
+
+    # -- master-chain inheritance --------------------------------------
+
+    @property
+    def master(self) -> Optional["Master"]:
+        """The :class:`~vsdx.master.Master` this shape instances, or ``None``.
+
+        Resolves the shape's raw ``@Master`` attribute (NameU string or
+        numeric ID) against the owning document's ``doc.masters``
+        collection. Returns ``None`` for shapes that are not master
+        instances, or when the shape was constructed without a proxy
+        parent chain (unit-test oxml fixtures).
+
+        .. versionadded:: 0.3.0
+        """
+        ref = self._element.get("Master")
+        if ref is None or ref == "":
+            return None
+        document = self._owning_document()
+        if document is None:
+            return None
+        return document.masters.resolve(ref)
+
+    @property
+    def master_chain(self) -> List["Master"]:
+        """Master inheritance chain, most-specific first.
+
+        Walks ``self.master`` then each master's ``parent_master_ref``
+        (``<Master Master="...">``) until the pointer is absent or a
+        cycle is detected. A cycle (a master referring back to one
+        already visited) is broken early with a ``logging.WARNING`` —
+        the chain is truncated at the first already-seen master.
+
+        Returns an empty list for shapes with no master, or when the
+        owning document cannot be resolved.
+
+        .. versionadded:: 0.3.0
+        """
+        chain: List["Master"] = []
+        seen_ids: set[int] = set()
+        current = self.master
+        while current is not None:
+            key = id(current._element)
+            if key in seen_ids:
+                _log.warning(
+                    "master-chain cycle detected at '%s'; truncating walk",
+                    getattr(current, "name_u", None) or "?",
+                )
+                break
+            seen_ids.add(key)
+            chain.append(current)
+            next_ref = current.parent_master_ref
+            if next_ref is None or next_ref == "":
+                break
+            masters = current._parent  # Masters collection
+            next_master = masters.resolve(next_ref) if masters is not None else None
+            if next_master is None:
+                break
+            current = next_master
+        return chain
+
+    def effective_prop(self, name: str) -> Optional[Any]:
+        """Resolve a named cell, walking up the master chain.
+
+        Order:
+
+        1. The instance shape's own ``<Cell N=name>`` (if present and
+           carrying a non-empty ``V`` / or just any value — absent is
+           the only "not defined" signal).
+        2. Each master in :attr:`master_chain`, in order.
+
+        Returns the cell proxy (carrying ``V``, ``U``, ``F``) for the
+        first match, or ``None`` if no master defines the cell either.
+        The proxy is returned rather than the raw value so callers can
+        discriminate between a numeric value, a formula-only cell, and
+        a theme reference.
+
+        .. versionadded:: 0.3.0
+        """
+        own = self._get_cell(name)
+        if own is not None:
+            return own
+        for master in self.master_chain:
+            cell = master.get_cell(name)
+            if cell is not None:
+                return cell
+        return None
+
+    def _effective_cell_float(self, name: str) -> Optional[float]:
+        """Return the float value of the effective ``<Cell N=name>``.
+
+        Private helper shared by the geometry accessors. Applies the
+        same empty-V / non-numeric guard as :func:`_cell_float` so
+        formula-only master cells (no ``V``) don't crash the caller.
+        """
+        cell = self.effective_prop(name)
+        if cell is None:
+            return None
+        v = cell.get("V")
+        if v is None or v == "":
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def effective_text(self) -> str:
+        """In-shape text, falling back to the master chain.
+
+        Returns the instance's ``<Text>`` content when non-empty;
+        otherwise walks :attr:`master_chain` and returns the first
+        non-empty master-level text. Returns the empty string when no
+        text is found anywhere in the chain.
+
+        .. versionadded:: 0.3.0
+        """
+        text_el = getattr(self._element, "text", None)
+        if text_el is not None:
+            own = text_el.text
+            if own:
+                return own
+        for master in self.master_chain:
+            mtext = master.text
+            if mtext:
+                return mtext
+        return ""
 
     # -- helpers --------------------------------------------------------
 
