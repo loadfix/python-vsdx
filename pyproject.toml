@@ -64,6 +64,9 @@ testpaths = ["tests"]
 python_files = "test_*.py *_test.py"
 python_classes = "Describe*"
 python_functions = "it_* its_* they_* and_* but_* test_*"
+markers = [
+    "conformance: byte-round-trip and Visio-desktop conformance harness (see tests/conformance/)",
+]
 
 [tool.ruff]
 line-length = 100
