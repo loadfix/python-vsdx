@@ -96,6 +96,56 @@ blob — the lazy re-parse only kicks in after the proxy has touched
 the tree. DrawingML namespaces are preserved across the round
 trip.
 
+## Ink annotations
+
+Visio ink annotations ride on the shared
+[`python-ooxml-ink`](../python-ooxml-ink/) 0.2 package — the same
+InkML-1.0 payload docx (`word/ink/`) and pptx (`ppt/ink/`) emit,
+parked under `/visio/ink/ink{n}.xml` and linked from the page part
+via the Microsoft ink relationship
+(`http://schemas.microsoft.com/office/2010/relationships/ink`).
+
+### `vsdx.Page.ink_strokes`
+
+Flat list of [`InkStroke`](src/vsdx/ink.py) for every `<inkml:trace>`
+on this page. Walks every ink relationship on the page part and
+enumerates traces in document order. Returns `[]` when the page has
+no ink parts.
+
+### `vsdx.Page.add_ink_stroke(points, pressure=None, color=None, width=None)`
+
+Append a stroke to the page and return its `InkStroke` proxy.
+Creates — or reuses — a single `/visio/ink/ink{n}.xml` part per page
+so repeated `add_ink_stroke` calls group into one file (mirroring how
+Office stores strokes drawn in a single "pen-down to pen-up"
+sequence). `points` is a list of `(x, y)` pairs or 3-tuples
+`(x, y, pressure)`; `color` is hex-RGB; `width` is pixel nib width.
+
+### `vsdx.VisioDocument.ink_strokes`
+
+Flat list of `InkStroke` across every page in the document, in
+source-order concatenation.
+
+### `vsdx.InkStroke`
+
+Read proxy over a single `<inkml:trace>`:
+
+- **`.points`** — list of 2-tuple `(x, y)` or 3-tuple `(x, y, pressure)`
+  sample points.
+- **`.color` / `.width`** — resolved brush properties from
+  `<inkml:definitions>`.
+- **`.pressure`** — third-channel values when every point carries
+  pressure, else `None`.
+- **`.id`** — the `xml:id` attribute on the trace (populated by
+  Office, unset on library-authored strokes).
+
+### Round-trip
+
+Strokes authored via `add_ink_stroke` survive `save` → `Visio(buf)`
+reload with their geometry, colour, width, and pressure intact. The
+`application/inkml+xml` content type is declared in
+`[Content_Types].xml` on save.
+
 ---
 
 Sections for other feature areas (pages, shapes, masters, layers,

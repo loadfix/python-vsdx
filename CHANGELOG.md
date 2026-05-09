@@ -6,6 +6,52 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — ink-annotation authoring via `python-ooxml-ink` 0.2 (R11-7)
+
+- **`vsdx.Page.ink_strokes`** — list of
+  [`InkStroke`](src/vsdx/ink.py) for every `<inkml:trace>` attached
+  to this page. Walks each ``RELATIONSHIP_TYPE_INK`` rel on the page
+  part, resolves the target :class:`~vsdx.parts.ink.InkPart`, and
+  enumerates traces in document order.
+- **`vsdx.Page.add_ink_stroke(points, pressure=None, color=None,
+  width=None)`** — append a new stroke to this page and return its
+  `InkStroke` proxy. Creates — or reuses — a single
+  ``/visio/ink/ink{n}.xml`` part per page. Accepts 2-tuple
+  ``(x, y)`` or 3-tuple ``(x, y, pressure)`` point lists; ``color``
+  is hex-RGB (``"#RRGGBB"`` or ``"RRGGBB"``); ``width`` is a pixel
+  nib width. `ValueError` on empty *points* or a pressure-length
+  mismatch.
+- **`vsdx.VisioDocument.ink_strokes`** — flat list of `InkStroke`
+  across every page in the document.
+- **`vsdx.InkStroke`** — read proxy over an ``<inkml:trace>``
+  exposing ``.points``, ``.color``, ``.width``, ``.pressure``, and
+  ``.id``. Resolved through the shared
+  [`ooxml_ink.Stroke`](../python-ooxml-ink/) semantics.
+- **`vsdx.parts.ink.InkPart`** — Visio subclass of
+  :class:`ooxml_ink.part.InkPart` with a
+  ``/visio/ink/ink{n}.xml`` partname allocator. Registered on the
+  shared ``PartFactory`` by
+  :func:`~vsdx.package.register_visio_parts` so load picks it up
+  automatically.
+- **dependency** — ``python-ooxml-ink`` pinned as ``git+https:`` for
+  0.2 authoring surface (``InkContent.add_stroke`` / ``Stroke`` /
+  brush authoring).
+
+### Tests — ink-annotation authoring (`tests/test_ink.py`)
+
+- **16 unit tests** across four describe classes:
+  - `DescribePageInkStrokes` — empty-by-default, append-and-expose,
+    color + width recording, per-point pressure (3-tuple and kwarg),
+    ink-part reuse across multiple strokes, `ValueError` on empty
+    points, `ValueError` on mismatched pressure length.
+  - `DescribeDocumentInkStrokes` — empty-by-default and cross-page
+    aggregation.
+  - `DescribeInkStrokeRoundTrip` — save + reload preserves
+    geometry / colour / width / pressure; ``/visio/ink/ink*.xml``
+    part appears in the saved zip; ``application/inkml+xml`` is
+    declared in ``[Content_Types].xml``; two consecutive round-trips.
+  - `DescribePublicSurface` — ``vsdx.InkStroke`` re-export.
+
 ### Added — theme proxies + per-page theme overrides (R8-14)
 
 - **`vsdx.theme.ColorScheme`** — dotted-attribute proxy over the

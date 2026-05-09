@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, cast
 
+from ooxml_ink import CONTENT_TYPE_INK
 from ooxml_opc import CONTENT_TYPE as CT
 from ooxml_opc import OpcPackage, Part, PartFactory
 
@@ -58,6 +59,7 @@ from vsdx.constants import (
 )
 from vsdx.parts.datarecordsets import DataRecordsetsPart
 from vsdx.parts.document import VisioDocumentPart
+from vsdx.parts.ink import InkPart
 from vsdx.parts.master import MasterPart, MastersPart
 from vsdx.parts.page import PagePart, PagesPart
 from vsdx.parts.stencil import StencilPart
@@ -103,6 +105,9 @@ VISIO_PART_TYPE_MAP: dict[str, type[Part]] = {
     # -- data recordsets (external-data binding) --
     # .. versionadded:: 0.2.0
     CT_VSDX_DATARECORDSETS: DataRecordsetsPart,
+    # -- ink annotations (shared InkML, MS ink relationship) --
+    # .. versionadded:: 0.3.0
+    CONTENT_TYPE_INK: InkPart,
 }
 
 

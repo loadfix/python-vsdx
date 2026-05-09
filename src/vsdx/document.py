@@ -20,6 +20,7 @@ from vsdx.theme import Theme
 from vsdx.util import lazyproperty
 
 if TYPE_CHECKING:
+    from vsdx.ink import InkStroke
     from vsdx.parts._stubs import DocumentPart, VisioPackage  # TODO(vsdx/track-2)
     from vsdx.parts.document import VisioDocumentPart
 
@@ -181,6 +182,23 @@ class VisioDocument(PartElementProxy):
         return [
             Theme(p) for p in self._package.iter_parts() if isinstance(p, ThemePart)
         ]
+
+    # -- ink annotations ------------------------------------------------
+
+    @property
+    def ink_strokes(self) -> "list[InkStroke]":
+        """Flat list of |InkStroke| across every page in this document.
+
+        Concatenates :attr:`vsdx.page.Page.ink_strokes` for each page in
+        :attr:`pages` (foreground + background) in source order. Returns
+        an empty list when no page carries an ink part.
+
+        .. versionadded:: 0.3.0
+        """
+        result: "list[InkStroke]" = []
+        for page in self.pages:
+            result.extend(page.ink_strokes)
+        return result
 
     # -- convenience ----------------------------------------------------
 

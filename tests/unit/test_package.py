@@ -162,10 +162,13 @@ class DescribeVisioPartTypeRegistration:
         # -- guard against silent drift in VISIO_PART_TYPE_MAP by spot- --
         # -- checking every key is a recognised family. 0.2.0 added the --
         # -- vbaProject binary for macro-enabled variants (.vsdm /      --
-        # -- .vssm / .vstm), which lives under ``vnd.ms-office.``.      --
+        # -- .vssm / .vstm), which lives under ``vnd.ms-office.``. 0.3.0 --
+        # -- added shared InkML (``application/inkml+xml``) for the ink --
+        # -- annotation parts under ``/visio/ink/``.                     --
         for ct in VISIO_PART_TYPE_MAP:
             assert (
                 ct.startswith("application/vnd.ms-visio.")
                 or ct == CT.OFC_THEME
                 or ct == "application/vnd.ms-office.vbaProject"
+                or ct == "application/inkml+xml"
             ), f"unexpected CT in map: {ct}"
