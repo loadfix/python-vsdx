@@ -6,6 +6,63 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — hyperlinks (R8-4)
+
+- **`vsdx.hyperlinks.Hyperlink`** — per-hyperlink proxy over one
+  ``<Row>`` inside ``<Section N="Hyperlink">``. Accessors: `.name`,
+  `.address`, `.sub_address`, `.description`, `.extra_info`,
+  `.new_window`, `.default`, `.invisible`, `.sort_key`. Boolean
+  setters tolerate ``TRUE`` / ``FALSE`` tokens on read and emit
+  ``1`` / ``0`` on write.
+- **`vsdx.hyperlinks.HyperlinkCollection`** — list-like +
+  description-keyed collection over the shape's
+  ``<Section N="Hyperlink">``. Accessed via **`Shape.hyperlinks`**.
+  Supports ``shape.hyperlinks[0]`` integer indexing,
+  ``shape.hyperlinks["Support site"]`` description lookup, ``len`` /
+  iteration / ``in`` (by description), plus ``.get(description,
+  default=None)`` and ``.default_hyperlink`` helpers.
+- **`HyperlinkCollection.add(address, *, description=None,
+  sub_address=None, extra_info=None, new_window=False, default=False,
+  invisible=False, sort_key=None, name=None)`** — appends a new
+  ``<Row>``. Auto-names rows ``Row_<n>`` matching Visio desktop.
+  Only emits cells the caller supplied (absent-is-falsey semantics).
+  Materialises the ``<Section N="Hyperlink">`` on first call.
+- **`HyperlinkCollection.remove(key)`** — deletes a hyperlink by
+  integer index, description string, or `Hyperlink` proxy.
+  Preserves the Section element even when the last row is removed
+  for round-trip byte-identity on re-add.
+- **One-default invariant** — setting `.default = True` on any
+  hyperlink (or passing `default=True` to `.add(...)`) auto-clears
+  the flag on every sibling so at most one hyperlink per shape is
+  marked default, matching Visio desktop's Ctrl+Click behaviour.
+- **`VisioDocument.hyperlink_base`** — document-wide relative-URL
+  base (``<DocumentSheet><Cell N="HyperlinkBase">``). Setter
+  materialises the DocumentSheet on demand; assigning `None` or
+  the empty string removes the cell.
+- **Zero new `CT_*` classes** — reuses the existing `CT_Section` /
+  `CT_Row` / `CT_Cell` trio with value-level dispatch on
+  ``section.@N == "Hyperlink"`` and ``row.@N`` for the hyperlink
+  name. Matches the R4-12 geometry + R8-3 shape-data pattern.
+- **`vsdx.Hyperlink` / `vsdx.HyperlinkCollection`** — public
+  re-exports on the top-level package namespace.
+
+### Tests — hyperlinks
+
+- **42 hyperlinks unit tests** (`tests/unit/test_hyperlinks.py`):
+  empty collection, first-add section materialisation, indexing
+  (int, negative int, by description), iteration, ``in`` membership,
+  error paths (`KeyError`, `IndexError`, `TypeError`); authoring
+  (auto-naming, explicit names, minimal-cell emission, sub-address-
+  only intra-document jumps, flag propagation); one-default invariant
+  (sibling auto-clear on add, on flag-setter flip, clearing without
+  replacement); cell accessors (textual, flag tokens including
+  TRUE/FALSE tolerance, absent-cell defaults); removal (by index /
+  description / proxy, error paths, section preservation); parse-
+  existing multi-hyperlink fixture + parse-mutate-read round trip;
+  `VisioDocument.hyperlink_base` (fresh = None, settable, DocumentSheet
+  materialisation, update-not-duplicate, None / empty-string clear,
+  no-op clear on empty); repr strings.
+
 ### Added — shape data / user-defined properties (R8-3)
 
 - **`vsdx.shape_data.ShapeData`** — dict-like proxy over the shape's

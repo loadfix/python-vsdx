@@ -61,6 +61,60 @@ class VisioDocument(PartElementProxy):
         """
         return DataGraphics(self)
 
+    # -- hyperlink base --------------------------------------------------
+
+    @property
+    def hyperlink_base(self) -> Optional[str]:
+        """The document-wide relative-URL base (``<Cell N="HyperlinkBase">``).
+
+        Visio's ``HyperlinkBase`` on the document sheet is prepended to
+        any shape-level relative hyperlink :attr:`~vsdx.hyperlinks.
+        Hyperlink.address` before resolution. Typical values: an
+        intranet root (``\\\\fileserver\\visio\\``), a project URL
+        (``https://example.com/docs/``), or a local directory.
+
+        Returns ``None`` when the cell is absent. The setter materialises
+        ``<DocumentSheet><Cell N="HyperlinkBase" V=...>`` on demand;
+        assigning ``None`` or the empty string removes the cell.
+
+        .. versionadded:: 0.3.0
+        """
+        sheet = self._element.documentSheet
+        if sheet is None:
+            return None
+        for cell in sheet.cell_lst:
+            if cell.get("N") == "HyperlinkBase":
+                return cell.get("V")
+        return None
+
+    @hyperlink_base.setter
+    def hyperlink_base(self, value: Optional[str]) -> None:
+        sheet = self._element.documentSheet
+        if value is None or value == "":
+            # Clearing: if there's no sheet, or no HyperlinkBase cell,
+            # nothing to do. Otherwise delete the cell (leave the sheet
+            # in place even if empty — it carries other state Visio
+            # cares about).
+            if sheet is None:
+                return
+            for cell in sheet.cell_lst:
+                if cell.get("N") == "HyperlinkBase":
+                    sheet.remove(cell)
+                    return
+            return
+        if sheet is None:
+            sheet = self._element.get_or_add_documentSheet()
+        # Locate-or-create the cell.
+        target = None
+        for cell in sheet.cell_lst:
+            if cell.get("N") == "HyperlinkBase":
+                target = cell
+                break
+        if target is None:
+            target = sheet._add_cell()
+            target.set("N", "HyperlinkBase")
+        target.set("V", str(value))
+
     @property
     def theme(self) -> Optional[Theme]:
         """The :class:`~vsdx.theme.Theme` proxy, or ``None`` if the

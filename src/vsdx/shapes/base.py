@@ -21,6 +21,7 @@ from vsdx.util import Inches, Length
 
 if TYPE_CHECKING:
     from vsdx.geometry import Geometries, Geometry
+    from vsdx.hyperlinks import HyperlinkCollection
     from vsdx.oxml._stubs import CT_Cell, CT_Shape  # TODO(vsdx/track-1)
     from vsdx.shape_data import ShapeData
     from vsdx.shapes.shapetree import ShapeTree
@@ -409,6 +410,26 @@ class Shape(ParentedElementProxy):
         from vsdx.shape_data import ShapeData
 
         return ShapeData(self)
+
+    # -- hyperlinks ------------------------------------------------------
+
+    @property
+    def hyperlinks(self) -> "HyperlinkCollection":
+        """The shape's :class:`~vsdx.hyperlinks.HyperlinkCollection` proxy.
+
+        List-like + description-keyed wrapper over the shape's
+        ``<Section N="Hyperlink">`` rows — ``shape.hyperlinks[0]``
+        indexes by position, ``shape.hyperlinks["Support"]`` looks up
+        by description. ``shape.hyperlinks.add(address=..., ...)``
+        appends a new hyperlink. Shapes without any Hyperlink section
+        expose an empty collection; the section is materialised on
+        first ``add`` call.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.hyperlinks import HyperlinkCollection
+
+        return HyperlinkCollection(self)
 
     # -- helpers --------------------------------------------------------
 
