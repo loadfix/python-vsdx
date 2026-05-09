@@ -108,7 +108,7 @@ class Connector(TextShape):
 
 
 def _cell_float(shape_el, name):  # type: ignore[no-untyped-def]
-    for cell in shape_el.findall("Cell"):
+    for cell in shape_el.cell_lst:
         if cell.get("N") == name:
             v = cell.get("V")
             if v is None or v == "":

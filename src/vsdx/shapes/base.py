@@ -28,8 +28,14 @@ if TYPE_CHECKING:
 
 
 def _cell_float(shape_el: "CT_Shape", name: str) -> Optional[float]:
-    """Return the float value of ``<Cell N=name>`` or ``None`` if absent."""
-    for cell in shape_el.findall("Cell"):
+    """Return the float value of ``<Cell N=name>`` or ``None`` if absent.
+
+    Walks the xmlchemy-generated ``cell_lst`` so namespace-qualified
+    ``{vsdx:}Cell`` children match. An unqualified ``findall("Cell")``
+    returns nothing on a parsed Visio tree because every element lives
+    under the default Visio namespace.
+    """
+    for cell in shape_el.cell_lst:
         if cell.get("N") == name:
             v = cell.get("V")
             if v is None or v == "":
@@ -198,8 +204,12 @@ class Shape(ParentedElementProxy):
     # -- helpers --------------------------------------------------------
 
     def _get_cell(self, name: str) -> Optional["CT_Cell"]:
-        """Return the ``<Cell N=name>`` child, or ``None`` if absent."""
-        for cell in self._element.findall("Cell"):
+        """Return the ``<Cell N=name>`` child, or ``None`` if absent.
+
+        Uses the xmlchemy-generated ``cell_lst`` rather than a raw
+        ``findall`` so the namespace-qualified lookup hits.
+        """
+        for cell in self._element.cell_lst:
             if cell.get("N") == name:
                 return cell  # type: ignore[return-value]
         return None
