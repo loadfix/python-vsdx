@@ -70,16 +70,23 @@ class VisioPackageOpener:
     @staticmethod
     def open(
         source: Union[str, "IO[bytes]"],
+        strict: bool = False,
     ) -> VisioDocument:
-        package = VisioPackage.open(source)
+        package = VisioPackage.open(source, strict=strict)
         return VisioDocument(package.main_document_part, package)
 
 
-def Visio(source: Optional[Union[str, "IO[bytes]"]] = None) -> VisioDocument:
+def Visio(
+    source: Optional[Union[str, "IO[bytes]"]] = None,
+    strict: bool = False,
+) -> VisioDocument:
     """Open an existing ``.vsdx`` / ``.vsdm`` or start a blank drawing.
 
     :param source: Path to an existing Visio drawing, a file-like
         object, or ``None`` to create a new blank document.
+    :param strict: When ``True``, forces Strict ECMA-376 conformance
+        handling even if the namespace sniff is inconclusive.
+        Defaults to ``False`` (auto-detect). ``[Added in 0.3.0]``
     :returns: A :class:`~vsdx.document.VisioDocument` proxy.
 
     A new document starts empty — call ``doc.pages.add_page()`` to
@@ -89,11 +96,13 @@ def Visio(source: Optional[Union[str, "IO[bytes]"]] = None) -> VisioDocument:
         Accepts ``.vsdm`` files as well as ``.vsdx``. Raises
         :class:`ValueError` if the file's root content-type is a
         stencil or template (use :func:`Stencil` / :func:`Template`).
+    .. versionadded:: 0.3.0
+        The *strict* parameter.
     """
     if source is None:
         package = VisioPackage.new()
         return VisioDocument(package.main_document_part, package)
-    package = VisioPackage.open(source)
+    package = VisioPackage.open(source, strict=strict)
     kind = _kind_of(package)
     if kind != VSDX_KIND_DRAWING:
         raise ValueError(
@@ -103,7 +112,10 @@ def Visio(source: Optional[Union[str, "IO[bytes]"]] = None) -> VisioDocument:
     return VisioDocument(package.main_document_part, package)
 
 
-def Stencil(source: Optional[Union[str, "IO[bytes]"]] = None) -> VisioDocument:
+def Stencil(
+    source: Optional[Union[str, "IO[bytes]"]] = None,
+    strict: bool = False,
+) -> VisioDocument:
     """Open a ``.vssx`` / ``.vssm`` stencil or start a blank stencil.
 
     Stencils are structurally identical to drawings but carry a
@@ -112,15 +124,19 @@ def Stencil(source: Optional[Union[str, "IO[bytes]"]] = None) -> VisioDocument:
 
     :param source: Path to an existing stencil, a file-like object,
         or ``None`` to create a new blank stencil.
+    :param strict: ``True`` forces Strict ECMA-376 conformance
+        handling; defaults to auto-detect. ``[Added in 0.3.0]``
     :raises ValueError: when opening a file whose root content-type
         is not a stencil.
 
     .. versionadded:: 0.2.0
+    .. versionadded:: 0.3.0
+        The *strict* parameter.
     """
     if source is None:
         package = VisioPackage.new(kind=VSDX_KIND_STENCIL)
         return VisioDocument(package.main_document_part, package)
-    package = VisioPackage.open(source)
+    package = VisioPackage.open(source, strict=strict)
     kind = _kind_of(package)
     if kind != VSDX_KIND_STENCIL:
         raise ValueError(
@@ -130,7 +146,10 @@ def Stencil(source: Optional[Union[str, "IO[bytes]"]] = None) -> VisioDocument:
     return VisioDocument(package.main_document_part, package)
 
 
-def Template(source: Optional[Union[str, "IO[bytes]"]] = None) -> VisioDocument:
+def Template(
+    source: Optional[Union[str, "IO[bytes]"]] = None,
+    strict: bool = False,
+) -> VisioDocument:
     """Open a ``.vstx`` / ``.vstm`` template or start a blank template.
 
     Templates behave identically to drawings at the file-format level
@@ -139,15 +158,19 @@ def Template(source: Optional[Union[str, "IO[bytes]"]] = None) -> VisioDocument:
 
     :param source: Path to an existing template, a file-like object,
         or ``None`` to create a new blank template.
+    :param strict: ``True`` forces Strict ECMA-376 conformance
+        handling; defaults to auto-detect. ``[Added in 0.3.0]``
     :raises ValueError: when opening a file whose root content-type
         is not a template.
 
     .. versionadded:: 0.2.0
+    .. versionadded:: 0.3.0
+        The *strict* parameter.
     """
     if source is None:
         package = VisioPackage.new(kind=VSDX_KIND_TEMPLATE)
         return VisioDocument(package.main_document_part, package)
-    package = VisioPackage.open(source)
+    package = VisioPackage.open(source, strict=strict)
     kind = _kind_of(package)
     if kind != VSDX_KIND_TEMPLATE:
         raise ValueError(

@@ -146,6 +146,54 @@ reload with their geometry, colour, width, and pressure intact. The
 `application/inkml+xml` content type is declared in
 `[Content_Types].xml` on save.
 
+## ECMA-376 Strict conformance class
+
+Visio packages are opened and saved in ECMA-376 *Transitional* mode
+by default. Strict-OOXML packages (those that declare the
+`purl.oclc.org/ooxml/...` namespace family on the OPC core relationships
+and content types) are auto-detected on open via the shared
+[`python-ooxml-opc`](../python-ooxml-opc/) 0.2+ runtime; callers that
+need to force the class, or round-trip a Strict package, use the
+`strict=` keyword plumbed through the factories and
+`VisioDocument.open()` / `.save()`.
+
+```python
+import vsdx
+
+# auto-detect (default)
+doc = vsdx.Visio("report.vsdx")
+
+# force Strict loading (useful for Flat-OPC Strict or ambiguous sniffs)
+doc = vsdx.Visio("report.vsdx", strict=True)
+print(doc.is_strict)  # True
+
+# preserve the loaded class on save (default — round-trip-preserving)
+doc.save("out.vsdx")
+
+# force Transitional emit regardless of source
+doc.save("out.vsdx", strict=False)
+
+# author a fresh package and tag it as Strict
+doc = vsdx.Visio()
+doc.is_strict = True
+doc.save("strict.vsdx")
+```
+
+- `vsdx.Visio(source=None, strict=False)` — `strict=` forces Strict
+  conformance handling on open. `[Added in 0.3.0]`
+- `vsdx.Stencil(source=None, strict=False)` — same keyword on the
+  stencil factory. `[Added in 0.3.0]`
+- `vsdx.Template(source=None, strict=False)` — same keyword on the
+  template factory. `[Added in 0.3.0]`
+- `VisioDocument.open(source, password=None, strict=False)` —
+  explicit low-level opener. `[Added in 0.3.0]`
+- `VisioDocument.save(target, password=None, strict=None)` —
+  `strict=None` (default) preserves the class the package was loaded
+  with; `True` / `False` force Strict / Transitional emit.
+  `[Added in 0.3.0]`
+- `VisioDocument.is_strict` — read / write the package's conformance
+  flag. `[Added in 0.3.0]`
+
 ---
 
 Sections for other feature areas (pages, shapes, masters, layers,

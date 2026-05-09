@@ -209,10 +209,31 @@ class VisioDocument(PartElementProxy):
 
     # -- save / open ----------------------------------------------------
 
+    # -- strict / conformance -------------------------------------------
+
+    @property
+    def is_strict(self) -> bool:
+        """``True`` when this package was loaded as ECMA-376 Strict.
+
+        Delegates to :attr:`ooxml_opc.OpcPackage.is_strict`. Authoring-
+        path packages (created via :func:`vsdx.Visio()`) are Transitional
+        by default. Assigning ``True`` / ``False`` flips the flag so
+        :meth:`save` emits the requested conformance class on the next
+        write (unless the *strict* kwarg on :meth:`save` overrides it).
+
+        .. versionadded:: 0.3.0
+        """
+        return self._package.is_strict
+
+    @is_strict.setter
+    def is_strict(self, value: bool) -> None:
+        self._package.is_strict = bool(value)
+
     def save(
         self,
         target: Union[str, IO[bytes]],
         password: Optional[str] = None,
+        strict: Optional[bool] = None,
     ) -> None:
         """Write the document to *target* (path or file-like).
 
@@ -229,11 +250,18 @@ class VisioDocument(PartElementProxy):
         never logged or included in exception messages raised by this
         method.
 
+        *strict* controls ECMA-376 conformance-class handling on emission:
+
+        - ``None`` (default) — preserve the class the package was loaded
+          with (:attr:`is_strict`). Round-trip-preserving.
+        - ``True`` — emit a Strict package regardless of source.
+        - ``False`` — emit a Transitional package regardless of source.
+
         .. versionadded:: 0.3.0
-           The *password* parameter.
+           The *password* and *strict* parameters.
         """
         if password is None:
-            self._package.save(target)
+            self._package.save(target, strict=strict)
             return
 
         try:
@@ -245,7 +273,7 @@ class VisioDocument(PartElementProxy):
             ) from exc
 
         plain_buf = io.BytesIO()
-        self._package.save(plain_buf)
+        self._package.save(plain_buf, strict=strict)
         # -- never include the password in error messages; re-raise as a
         # -- generic EncryptedPackageError so the secret is not surfaced.
         try:
@@ -267,6 +295,7 @@ class VisioDocument(PartElementProxy):
     def open(
         source: Union[str, IO[bytes]],
         password: Optional[str] = None,
+        strict: bool = False,
     ) -> VisioDocument:
         """Open an existing ``.vsdx`` / ``.vsdm`` drawing, decrypting if needed.
 
@@ -275,12 +304,21 @@ class VisioDocument(PartElementProxy):
         loader parses it. The decrypted bytes are held in memory only
         for the duration of ``_load`` and then discarded.
 
+        *strict* controls ECMA-376 conformance-class handling at load:
+
+        - ``False`` (default) — auto-detect. Packages declaring the
+          Strict OOXML namespace family (``purl.oclc.org/ooxml``) are
+          opened in Strict mode and :attr:`is_strict` becomes ``True``.
+        - ``True`` — explicitly opt in. Useful for Flat-OPC Strict
+          packages whose sniff is inconclusive.
+
         :raises EncryptedPackageError: when *source* is encrypted and
             either *password* is ``None`` or the password does not
             match the verifier stored in the container. The password
             itself is never surfaced in the exception message.
 
         .. versionadded:: 0.3.0
+           The *strict* parameter.
         """
         # -- local import to avoid a cycle with vsdx.package --
         from vsdx.package import VisioPackage
@@ -314,10 +352,10 @@ class VisioDocument(PartElementProxy):
                     "Decryption failed: %s" % exc_name
                 ) from None
 
-            package = VisioPackage.open(io.BytesIO(plain))
+            package = VisioPackage.open(io.BytesIO(plain), strict=strict)
         else:
             stream.seek(0)
-            package = VisioPackage.open(stream)
+            package = VisioPackage.open(stream, strict=strict)
 
         return VisioDocument(package.main_document_part, package)
 
