@@ -6,6 +6,31 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — password-protected save/open via `python-ooxml-crypto` 0.3 (R12-2)
+
+- **`vsdx.VisioDocument.save(target, password=None)`** — when
+  ``password`` is provided, the produced ``.vsdx`` zip is wrapped in
+  an ECMA-376 Agile Encryption CFB container, matching the format
+  Microsoft Visio/Office writes when a user sets a password in the
+  desktop app. Requires the optional
+  [`python-ooxml-crypto`](https://github.com/loadfix/python-ooxml-crypto)
+  dependency (``pip install 'python-vsdx[encryption]'``).
+- **`vsdx.VisioDocument.open(source, password=None)`** — transparent
+  decryption of an encrypted ``.vsdx``. When ``source`` starts with
+  the OLE2 CFB magic (``D0 CF 11 E0 …``) the stream is decrypted
+  with ``password`` before being handed to the OPC loader. Raises
+  :class:`~vsdx.document.EncryptedPackageError` on a wrong password
+  or when ``password`` is omitted against an encrypted container.
+- **`vsdx.document.EncryptedPackageError`** — surface exception
+  for password-protected read/write. Inherits from :class:`ValueError`
+  for symmetry with the sister ``python-docx`` / ``python-pptx``
+  exception hierarchies. The supplied password is **never** echoed
+  in the exception message.
+- **Unicode passwords pass through unchanged** — the vsdx wrapper
+  hands the string verbatim to ``ooxml_crypto``, which applies the
+  MS-OFFCRYPTO UTF-16-LE encoding. Composed characters survive the
+  round-trip without normalisation.
+
 ### Added — ink-annotation authoring via `python-ooxml-ink` 0.2 (R11-7)
 
 - **`vsdx.Page.ink_strokes`** — list of

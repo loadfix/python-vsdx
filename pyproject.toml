@@ -51,6 +51,15 @@ dev = [
 docs = [
     "sphinx>=8.0.0",
 ]
+# -- Optional ECMA-376 Agile Encryption support for password-protected
+#    .vsdx save/open. The runtime wiring lives in
+#    :meth:`vsdx.document.VisioDocument.save` /
+#    :meth:`~vsdx.document.VisioDocument.open`; callers that never touch
+#    ``password=`` can omit this extra. Requires >=0.3.0 for the public
+#    ``encrypt`` API (0.2.x carried only ``decrypt``).
+encryption = [
+    "python-ooxml-crypto @ git+https://github.com/loadfix/python-ooxml-crypto@master",
+]
 
 [tool.setuptools.dynamic]
 version = {attr = "vsdx.__version__"}

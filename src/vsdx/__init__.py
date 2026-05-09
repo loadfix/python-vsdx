@@ -52,7 +52,7 @@ from vsdx.constants import (
     RT_VISIO_PAGES,
     RT_VISIO_WINDOWS,
 )
-from vsdx.document import VisioDocument
+from vsdx.document import EncryptedPackageError, VisioDocument
 from vsdx.enum.shapes import VS_CONNECTOR_STYLE, VS_SHAPE_TYPE
 from vsdx.hyperlinks import Hyperlink, HyperlinkCollection
 from vsdx.ink import InkStroke
@@ -137,6 +137,7 @@ __all__ = [
     "Ellipse",
     "EllipticalArcTo",
     "Emu",
+    "EncryptedPackageError",
     "FontScheme",
     "Geometries",
     "Geometry",
