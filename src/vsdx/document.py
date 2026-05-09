@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import IO, TYPE_CHECKING, Optional, Union, cast
 
+from vsdx.data_graphics import DataGraphics
 from vsdx.master import Masters
 from vsdx.page import Pages
 from vsdx.shared import PartElementProxy
@@ -43,6 +44,22 @@ class VisioDocument(PartElementProxy):
     def masters(self) -> Masters:
         """The :class:`~vsdx.master.Masters` collection."""
         return Masters(self._package.masters_part, self)
+
+    @lazyproperty
+    def data_graphics(self) -> DataGraphics:
+        """The :class:`~vsdx.data_graphics.DataGraphics` collection.
+
+        Iterates every ``<Section N="DataGraphic">`` at the document
+        root. Packages authored outside Visio desktop (including the
+        bare package produced by :func:`vsdx.Visio()`) carry an empty
+        collection until a data graphic is imported.
+
+        Read-only in 0.2.0 — authoring lands in 0.3.0. See
+        :mod:`vsdx.data_graphics`.
+
+        .. versionadded:: 0.2.0
+        """
+        return DataGraphics(self)
 
     @property
     def theme(self) -> Optional[Theme]:

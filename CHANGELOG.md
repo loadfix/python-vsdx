@@ -6,6 +6,51 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — data graphics (R8-2, read + preserve + shape-side mutate)
+
+- **`vsdx.data_graphics.DataGraphic`** — proxy over one
+  `<Section N="DataGraphic">` child of `<VisioDocument>`. Exposes
+  `id` (document-scoped `@IX`), `name` / `name_universal`,
+  `default_position`, `default_style`, `hide_shape_data_fields`, and
+  an iterable `items` collection of :class:`DataGraphicItem` rows in
+  `@IX` order.
+- **`vsdx.data_graphics.DataGraphicItem`** — proxy over a single
+  `<Row IX="n" T="kind">` inside a DataGraphic section. Surfaces
+  `kind` (``TextCallout`` / ``IconSet`` / ``ColorByValue`` /
+  ``DataBar``), `column` (bound ShapeData field formula), and a
+  `cells` dict for per-kind cells the proxy doesn't specialise
+  (``LowValue`` / ``HighValue`` / ``BarStyle`` / ``IconSet`` …).
+  `element` exposes the underlying `<Row>` for formula / unit
+  access.
+- **`vsdx.data_graphics.DataGraphics`** — document-scoped collection.
+  `document.data_graphics` iterates every DataGraphic section on the
+  document root, supports indexing + `len`, and offers `get(id)` /
+  `get_by_name(name)` lookups. Ignores non-DataGraphic sibling
+  sections.
+- **`Shape.data_graphic`** — resolves
+  `<Cell N="DataGraphic" V="<id>">` against the owning document's
+  `data_graphics`. Returns `None` when the cell is absent, empty, or
+  points at an unknown id (defensive guard). Setter accepts
+  `DataGraphic | None`; assigning `None` removes the cell.
+- **`CT_VisioDocument.section_lst`** — new `ZeroOrMore("vsdx:Section")`
+  descriptor so document-root sections round-trip through xmlchemy.
+- **`vsdx.DataGraphic` / `vsdx.DataGraphicItem` / `vsdx.DataGraphics`** —
+  public re-exports on the top-level package namespace.
+- **Scope** — 0.2.0 is read-only + shape-side association.
+  `document.add_data_graphic(...)` full authoring is **deferred to
+  0.3.0** pending schema-parity verification against an authored-in-
+  Visio-desktop fixture.
+
+### Tests — data graphics
+
+- **24 new unit tests** (`tests/unit/test_data_graphics.py`): empty
+  collection, document-order iteration, id + name lookup,
+  non-DataGraphic-section filtering, item `@IX` sort, per-kind cell
+  dict, shape ↔ graphic association (link, clear, orphan-id guard,
+  TypeError on non-DataGraphic assignment), parse → serialise round
+  trip on both the section and the shape cell, and public-export
+  re-surfacing.
+
 ### Added — custom geometry (R4-12, scoping §4.3 / §4.4)
 
 - **`vsdx.geometry.Geometry`** and **`vsdx.geometry.Geometries`** —

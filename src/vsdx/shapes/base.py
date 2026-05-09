@@ -264,6 +264,80 @@ class Shape(ParentedElementProxy):
         indices = [layer.index for layer in layers]
         _set_shape_layer_indices(self._element, indices)
 
+    # -- data graphics --------------------------------------------------
+
+    @property
+    def data_graphic(self):
+        """The :class:`~vsdx.data_graphics.DataGraphic` linked to this shape, or ``None``.
+
+        Resolves ``<Cell N="DataGraphic" V="<id>">`` on the shape
+        against the document's
+        :attr:`~vsdx.document.VisioDocument.data_graphics` collection.
+        Returns ``None`` when the cell is absent, empty, or points at
+        an id no definition carries (a defensive guard against
+        orphaned references in hand-edited packages).
+
+        .. versionadded:: 0.2.0
+        """
+        from vsdx.data_graphics import _resolve_shape_data_graphic
+
+        document = self._owning_document()
+        if document is None:
+            return None
+        return _resolve_shape_data_graphic(self, document)
+
+    @data_graphic.setter
+    def data_graphic(self, value) -> None:
+        """Link this shape to *value* (:class:`DataGraphic` or ``None``).
+
+        Assigning ``None`` removes the ``<Cell N="DataGraphic">`` cell
+        entirely — the shape reverts to plain rendering. Assigning a
+        :class:`DataGraphic` proxy writes that graphic's ``id`` into
+        the cell.
+
+        .. versionadded:: 0.2.0
+        """
+        from vsdx.data_graphics import DataGraphic, _set_shape_data_graphic_id
+
+        if value is None:
+            _set_shape_data_graphic_id(self._element, None)
+            return
+        if not isinstance(value, DataGraphic):
+            raise TypeError(
+                "shape.data_graphic must be a DataGraphic or None, "
+                "got %s" % type(value).__name__
+            )
+        _set_shape_data_graphic_id(self._element, value.id)
+
+    def _owning_document(self):
+        """Walk up the proxy tree to the :class:`VisioDocument` that owns
+        this shape. Returns ``None`` when the shape was constructed
+        without a parent chain (unit-test oxml-only fixtures).
+
+        Private — exposed for :attr:`data_graphic` resolution.
+        """
+        from vsdx.document import VisioDocument
+        from vsdx.page import Page
+        from vsdx.shapes.shapetree import ShapeTree
+
+        node = self._parent
+        while node is not None:
+            if isinstance(node, VisioDocument):
+                return node
+            if isinstance(node, Page):
+                # Page._parent is the Pages collection, which carries
+                # the document as its parent.
+                pages = getattr(node, "_parent", None)
+                doc = getattr(pages, "_parent", None)
+                if isinstance(doc, VisioDocument):
+                    return doc
+                return None
+            if isinstance(node, ShapeTree):
+                node = node._parent
+                continue
+            node = getattr(node, "_parent", None)
+        return None
+
     # -- custom geometry ------------------------------------------------
 
     @property
