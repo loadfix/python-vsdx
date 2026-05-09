@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import IO, Optional, Union
 
 from vsdx.document import VisioDocument
-from vsdx.parts import VisioPackage
+from vsdx.package import VisioPackage
 
 
 def Visio(source: Optional[Union[str, "IO[bytes]"]] = None) -> VisioDocument:
