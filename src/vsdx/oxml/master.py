@@ -85,6 +85,13 @@ class CT_Master(BaseOxmlElement):
     name_u = OptionalAttribute("NameU", XsdString)
     base_id = OptionalAttribute("BaseID", XsdString)
     unique_id = OptionalAttribute("UniqueID", XsdString)
+    # ``@Master`` on a ``<Master>`` index entry identifies a *parent*
+    # master in the master-chain inheritance model. The proxy layer's
+    # :meth:`~vsdx.shapes.base.Shape.master_chain` walks this pointer
+    # transitively. Typed as ``XsdString`` rather than ``XsdUnsignedInt``
+    # because authoring in this library uses NameU strings for master
+    # references (see :class:`~vsdx.oxml.shape.CT_Shape` comment).
+    master = OptionalAttribute("Master", XsdString)
     master_type = OptionalAttribute("MasterType", XsdUnsignedInt)
     hidden = OptionalAttribute("Hidden", XsdString)
     match_by_name = OptionalAttribute("MatchByName", XsdString)

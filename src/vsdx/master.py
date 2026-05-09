@@ -8,7 +8,7 @@ page — full custom master creation lands in 0.2.0.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator, Optional
+from typing import TYPE_CHECKING, Any, Iterator, Optional
 
 from vsdx.enum.shapes import VS_SHAPE_TYPE
 from vsdx.shared import ParentedElementProxy, PartElementProxy
@@ -67,6 +67,87 @@ class Master(PartElementProxy):
     def part(self):  # type: ignore[override]
         return self._master_part
 
+    # -- inheritance-chain support -------------------------------------
+
+    @property
+    def parent_master_ref(self) -> Optional[str]:
+        """Raw ``@Master`` attribute on this master's index entry, or ``None``.
+
+        When a master is itself derived from another master (``<Master
+        Master="Parent">``), that pointer tells
+        :attr:`~vsdx.shapes.base.Shape.master_chain` where to continue
+        the walk. Per this library's convention the reference is a
+        NameU string; a spec-conformant integer ID also works because
+        the resolver falls back to ID-based lookup.
+
+        .. versionadded:: 0.3.0
+        """
+        return self._element.get("Master")
+
+    @property
+    def _content_shape_element(self) -> Optional[Any]:
+        """First ``<Shape>`` inside this master's ``<MasterContents>``.
+
+        Master shape-sheet cells (``PinX``, ``Width``, geometry, text,
+        …) live on this shape. Returns ``None`` when the master part
+        carries no shapes, or is an index-only entry with no contents
+        part wired through yet.
+
+        Private helper used by the inheritance resolver.
+        """
+        part = self._master_part
+        contents = getattr(part, "element", None) if part is not None else None
+        if contents is None:
+            return None
+        shapes_el = getattr(contents, "shapes", None)
+        if shapes_el is None:
+            return None
+        shape_lst = getattr(shapes_el, "shape_lst", None)
+        if not shape_lst:
+            return None
+        return shape_lst[0]
+
+    def get_cell(self, name: str) -> Optional[Any]:
+        """Return the master's ``<Cell N=name>`` proxy, or ``None``.
+
+        Consults first the master-index ``<PageSheet>`` (Visio's home
+        for default shape cells on a master) and then the first shape
+        inside ``<MasterContents>``. The proxy layer's
+        :meth:`~vsdx.shapes.base.Shape.effective_prop` calls this on
+        every master in the chain.
+
+        .. versionadded:: 0.3.0
+        """
+        page_sheet = getattr(self._element, "pageSheet", None)
+        if page_sheet is not None:
+            for cell in getattr(page_sheet, "cell_lst", []):
+                if cell.get("N") == name:
+                    return cell
+        content_shape = self._content_shape_element
+        if content_shape is not None:
+            for cell in getattr(content_shape, "cell_lst", []):
+                if cell.get("N") == name:
+                    return cell
+        return None
+
+    @property
+    def text(self) -> Optional[str]:
+        """Text carried by the master's first shape, or ``None``.
+
+        Read only — masters are templates, so setting text belongs on
+        the instance. Used by :attr:`~vsdx.shapes.base.Shape.effective_text`
+        when the instance shape itself carries no text.
+
+        .. versionadded:: 0.3.0
+        """
+        content_shape = self._content_shape_element
+        if content_shape is None:
+            return None
+        text_el = getattr(content_shape, "text", None)
+        if text_el is None:
+            return None
+        return text_el.text or None
+
 
 class Masters(ParentedElementProxy):
     """Collection of masters on a :class:`~vsdx.document.VisioDocument`.
@@ -106,6 +187,29 @@ class Masters(ParentedElementProxy):
             if m.name_u == key:
                 return True
         return False
+
+    def resolve(self, ref: Optional[str]) -> Optional[Master]:
+        """Look up a master by NameU *or* by numeric ``@ID``.
+
+        Handles both this library's NameU-based master references
+        (authored via ``add_shape(master_name_u=...)``) and spec-literal
+        integer IDs seen in Visio-desktop-authored packages. Returns
+        ``None`` when *ref* is falsy or does not resolve — callers
+        detect "no master chain" by the ``None`` return.
+
+        .. versionadded:: 0.3.0
+        """
+        if ref is None or ref == "":
+            return None
+        # First, NameU match (this library's authoring convention).
+        for m in self._master_cache:
+            if m.name_u == ref:
+                return m
+        # Then, numeric ``@ID`` match (ECMA-literal convention).
+        for m in self._master_cache:
+            if m.master_id == ref:
+                return m
+        return None
 
     # -- authoring ------------------------------------------------------
 
