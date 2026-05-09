@@ -28,6 +28,13 @@ from vsdx.formula.nodes import (
 )
 from vsdx.formula.parser import parse
 
+# Functions that need non-standard (lazy / context-aware) evaluation and
+# therefore cannot go through the default eager-eval BUILTINS dispatch.
+# ``IF`` / ``AND`` / ``OR`` short-circuit on their condition; ``USE``
+# tries to resolve a named cell against the current context before
+# falling back to the builtin passthrough.
+_SPECIAL_FORMS = {"IF", "AND", "OR", "USE"}
+
 
 class Evaluator:
     """Evaluates a parsed AST against a :class:`ShapeSheetContext`.
@@ -137,6 +144,9 @@ class Evaluator:
         raise FormulaEvaluationError(f"unknown comparison operator {op!r}")
 
     def _eval_function(self, node: FunctionCall) -> FormulaValue:
+        upper = node.name.upper()
+        if upper in _SPECIAL_FORMS:
+            return self._eval_special_form(upper, node)
         fn = BUILTINS.get(node.name)
         if fn is None:
             raise FormulaEvaluationError(
@@ -144,6 +154,61 @@ class Evaluator:
             )
         evaluated_args = tuple(self._eval(arg) for arg in node.args)
         return fn(*evaluated_args)
+
+    def _eval_special_form(self, name: str, node: FunctionCall) -> FormulaValue:
+        """Lazy / context-aware evaluation for :data:`_SPECIAL_FORMS`."""
+        if name == "IF":
+            # Short-circuit: evaluate only the selected branch. Matches
+            # Visio / Excel semantics where the unused branch is never
+            # resolved (so IF(0, 1/0, 42) == 42 without division error).
+            if not 2 <= len(node.args) <= 3:
+                raise FormulaEvaluationError(
+                    f"IF expects 2 or 3 argument(s), got {len(node.args)}"
+                )
+            cond = self._eval(node.args[0])
+            if _to_bool(cond):
+                return self._eval(node.args[1])
+            if len(node.args) == 3:
+                return self._eval(node.args[2])
+            return False
+
+        if name == "AND":
+            if not node.args:
+                raise FormulaEvaluationError("AND requires at least one argument")
+            for arg in node.args:
+                if not _to_bool(self._eval(arg)):
+                    return False
+            return True
+
+        if name == "OR":
+            if not node.args:
+                raise FormulaEvaluationError("OR requires at least one argument")
+            for arg in node.args:
+                if _to_bool(self._eval(arg)):
+                    return True
+            return False
+
+        if name == "USE":
+            # Try to resolve the argument as a named cell against the
+            # current context; fall through to the passthrough builtin
+            # when the name is unknown or no context is attached. This
+            # matches Visio's USE(masterName) which inherits a master's
+            # cell value when one is registered in the PageSheet.
+            if len(node.args) != 1:
+                raise FormulaEvaluationError(
+                    f"USE expects exactly 1 argument, got {len(node.args)}"
+                )
+            target = self._eval(node.args[0])
+            if isinstance(target, str) and self._context is not None:
+                probe = CellRef(name=target)
+                resolved = self._context.resolve(probe)
+                if resolved is not None:
+                    return resolved
+            return target
+
+        raise FormulaEvaluationError(  # pragma: no cover — guarded by caller
+            f"unimplemented special form {name!r}"
+        )
 
 
 def evaluate(

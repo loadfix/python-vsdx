@@ -169,3 +169,117 @@ class DescribeEvaluatorInstance:
         b = _parse("Height - 1")
         assert ev.eval_ast(a) == 11.0
         assert ev.eval_ast(b) == 3.0
+
+
+# ---------------------------------------------------------------- R11-4 builtins
+
+
+class DescribeGuardAndSetAtRefFamily:
+    """GUARD / SETATREF / SETATREFEXPR / SETATREFEVAL are identity-return
+    passthroughs (the authoring-time side effect is not modelled at eval
+    time — we just need the round-trip value to survive)."""
+
+    def it_guard_returns_its_argument_unchanged(self):
+        assert evaluate("GUARD(42)") == 42.0
+        assert evaluate('GUARD("x")') == "x"
+
+    def it_setatref_variants_are_identity(self):
+        assert evaluate("SETATREF(99)") == 99.0
+        assert evaluate("SETATREFEXPR(12)") == 12.0
+        assert evaluate("SETATREFEVAL(7)") == 7.0
+
+
+class DescribeDependsOn:
+    def it_returns_a_value_and_accepts_many_args(self):
+        # Preserves existing semantics (see test_formula_builtins.py): the
+        # dependency graph walk owns the side effect; the evaluator just
+        # needs the call to succeed.
+        assert evaluate("DEPENDSON(1, 2, 3)") == 1.0
+
+    def it_accepts_a_single_arg(self):
+        assert evaluate("DEPENDSON(42)") == 42.0
+
+
+class DescribeSumIf:
+    def it_sums_when_scalar_matches_a_literal(self):
+        # SUMIF(range, condition, [sum_range]) — simplified scalar form.
+        # With condition 5 and value 5, the "range" qualifies, so we sum
+        # the sum_range (10).
+        assert evaluate("SUMIF(5, 5, 10)") == 10.0
+        assert evaluate("SUMIF(5, 6, 10)") == 0.0
+
+    def it_parses_comparison_operator_conditions(self):
+        assert evaluate('SUMIF(7, ">5", 3)') == 3.0
+        assert evaluate('SUMIF(2, ">5", 3)') == 0.0
+        assert evaluate('SUMIF(10, "<=10", 1)') == 1.0
+
+    def it_defaults_sum_value_to_range_value(self):
+        assert evaluate("SUMIF(4, 4)") == 4.0
+        assert evaluate("SUMIF(4, 5)") == 0.0
+
+
+class DescribeUseFunction:
+    def it_looks_up_a_named_cell_when_context_has_one(self):
+        from vsdx.formula.context import MappingShapeSheetContext
+
+        ctx_ = MappingShapeSheetContext({"MyMaster": 123.0})
+        assert evaluate('USE("MyMaster")', ctx_) == 123.0
+
+    def it_falls_back_to_passthrough_when_name_unknown(self):
+        from vsdx.formula.context import MappingShapeSheetContext
+
+        ctx_ = MappingShapeSheetContext({})
+        assert evaluate('USE("Unknown")', ctx_) == "Unknown"
+
+    def it_passes_through_when_no_context_attached(self):
+        assert evaluate('USE("MasterName")') == "MasterName"
+
+
+class DescribeGeometryBuiltins:
+    def it_height_and_width_are_passthroughs(self):
+        assert evaluate("HEIGHT(4.5)") == 4.5
+        assert evaluate("WIDTH(10)") == 10.0
+
+    def it_height_and_width_default_to_zero(self):
+        assert evaluate("HEIGHT()") == 0.0
+        assert evaluate("WIDTH()") == 0.0
+
+    def it_pnt_returns_a_tuple(self):
+        assert evaluate("PNT(1, 2)") == (1.0, 2.0)
+        assert evaluate("PNT(-3, 4.5)") == (-3.0, 4.5)
+
+    def it_loctopar_partoloc_are_passthroughs(self):
+        assert evaluate("LOCTOPAR(7)") == 7.0
+        assert evaluate("PARTOLOC(7)") == 7.0
+        assert evaluate("LOCTOPAR(-2.5)") == -2.5
+
+
+class DescribeIfShortCircuit:
+    def it_does_not_evaluate_false_branch_when_true(self):
+        # 1/0 would raise if evaluated — short-circuit must skip it.
+        assert evaluate("IF(1 > 0, 42, 1/0)") == 42.0
+
+    def it_does_not_evaluate_true_branch_when_false(self):
+        assert evaluate("IF(1 < 0, 1/0, 99)") == 99.0
+
+    def it_returns_false_when_no_else_branch_given(self):
+        # Two-arg IF is uncommon but the parser accepts it; the short-
+        # circuit path must still yield a concrete value.
+        assert evaluate("IF(1 > 0, 5)") == 5.0
+        assert evaluate("IF(1 < 0, 5)") is False
+
+
+class DescribeLogicalShortCircuit:
+    def it_and_short_circuits_on_first_false(self):
+        # If AND were eager, 1/0 would raise; short-circuit must skip it.
+        assert evaluate("AND(FALSE, 1/0)") is False
+        assert evaluate("AND(TRUE, TRUE, TRUE)") is True
+
+    def it_or_short_circuits_on_first_true(self):
+        assert evaluate("OR(TRUE, 1/0)") is True
+        assert evaluate("OR(FALSE, FALSE, FALSE)") is False
+
+    def it_not_inverts_truthiness(self):
+        assert evaluate("NOT(FALSE)") is True
+        assert evaluate("NOT(TRUE)") is False
+        assert evaluate("NOT(0)") is True

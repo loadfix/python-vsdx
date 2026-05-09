@@ -179,6 +179,52 @@ class DescribeArity:
             BUILTINS["ABS"](1, 2)  # needs exactly 1
 
 
+class DescribeSumIfBuiltin:
+    """Scalar SUMIF — the 0.1.0 simplification of the full range form."""
+
+    def it_includes_when_scalar_equals_condition(self):
+        assert BUILTINS["SUMIF"](5, 5, 10) == 10.0
+        assert BUILTINS["SUMIF"](5, 5) == 5.0  # sum_value defaults to range.
+
+    def it_excludes_when_scalar_fails_condition(self):
+        assert BUILTINS["SUMIF"](3, 5, 10) == 0.0
+        assert BUILTINS["SUMIF"](3, ">5", 10) == 0.0
+
+    @pytest.mark.parametrize(
+        ("value", "condition", "expected"),
+        [
+            (7, ">5", 1.0),
+            (5, ">=5", 1.0),
+            (4, "<5", 1.0),
+            (5, "<=5", 1.0),
+            (5, "<>0", 1.0),
+            (0, "<>0", 0.0),
+            (5, "=5", 1.0),
+        ],
+    )
+    def it_parses_comparison_prefix_conditions(self, value, condition, expected):
+        assert BUILTINS["SUMIF"](value, condition, 1) == expected
+
+
+class DescribeGeometryBuiltins:
+    def it_height_and_width_passthrough(self):
+        assert BUILTINS["HEIGHT"](5) == 5
+        assert BUILTINS["WIDTH"](7.5) == 7.5
+
+    def it_height_and_width_default_to_zero(self):
+        assert BUILTINS["HEIGHT"]() == 0.0
+        assert BUILTINS["WIDTH"]() == 0.0
+
+    def it_pnt_returns_tuple(self):
+        assert BUILTINS["PNT"](1, 2) == (1.0, 2.0)
+        assert BUILTINS["PNT"](0, -3.5) == (0.0, -3.5)
+
+    def it_loctopar_and_partoloc_passthrough(self):
+        assert BUILTINS["LOCTOPAR"](9) == 9
+        assert BUILTINS["PARTOLOC"](9) == 9
+        assert BUILTINS["LOCTOPAR"]("x") == "x"
+
+
 class DescribeRegisterFunction:
     def it_allows_plugin_registration(self):
         def double(x):

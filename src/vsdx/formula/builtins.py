@@ -22,7 +22,10 @@ Coverage notes:
   ``TRIM``, ``FORMAT``, ``FORMATEX``, ``CONCATENATE``.
 - **ShapeSheet-specific**: ``GUARD``, ``SETATREF``, ``SETATREFEVAL``,
   ``SETATREFEXPR``, ``DEPENDSON``, ``THEMEVAL``, ``USE``,
-  ``BOUND``, ``MINMAX``, ``FALSE``, ``TRUE``.
+  ``BOUND``, ``MINMAX``, ``FALSE``, ``TRUE``, ``SUMIF``.
+- **Geometry passthroughs**: ``HEIGHT``, ``WIDTH``, ``PNT``, ``LOCTOPAR``,
+  ``PARTOLOC`` — return their argument as-is (or a tuple for ``PNT``)
+  so formulas round-trip losslessly pending a geometry-aware pass.
 
 Functions the evaluator logs a TODO for but does not implement (too
 context-sensitive, never encountered in 0.1.0 fixtures): ``RUNADDON``,
@@ -35,7 +38,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 from vsdx.formula.errors import FormulaEvaluationError, FormulaTypeError
 
@@ -477,6 +480,112 @@ def _fn_false() -> bool:
     return False
 
 
+# ----------------------------------------------------------------------- sumif
+
+
+def _matches_sumif_condition(value: FormulaValue, condition: FormulaValue) -> bool:
+    """Test ``value`` against a SUMIF condition.
+
+    Visio / Excel SUMIF accepts conditions either as a scalar (implicit
+    equality) or as a string starting with a comparison operator:
+    ``">5"``, ``"<=10"``, ``"<>0"``, ``"=3"``. We mirror that subset —
+    enough for the ShapeSheet formulas we've seen in the wild.
+    """
+    if isinstance(condition, str):
+        text = condition.strip()
+        for op in ("<=", ">=", "<>", "=", "<", ">"):
+            if text.startswith(op):
+                rhs_text = text[len(op):].strip()
+                try:
+                    rhs: FormulaValue = float(rhs_text)
+                except ValueError:
+                    rhs = rhs_text
+                try:
+                    lv = _to_number(value, func="SUMIF")
+                    rv = _to_number(rhs, func="SUMIF")
+                except FormulaTypeError:
+                    lv = _to_string(value)
+                    rv = _to_string(rhs)
+                if op == "=":
+                    return lv == rv
+                if op == "<>":
+                    return lv != rv
+                if op == "<":
+                    return lv < rv
+                if op == "<=":
+                    return lv <= rv
+                if op == ">":
+                    return lv > rv
+                if op == ">=":
+                    return lv >= rv
+        # No operator prefix — treat as literal equality on strings.
+        return _to_string(value) == text
+    # Non-string condition: scalar equality after numeric coercion.
+    try:
+        return _to_number(value, func="SUMIF") == _to_number(condition, func="SUMIF")
+    except FormulaTypeError:
+        return value == condition
+
+
+def _fn_sumif(
+    range_value: FormulaValue,
+    condition: FormulaValue,
+    sum_value: FormulaValue = None,
+) -> float:
+    """Simplified SUMIF over a single scalar.
+
+    Full Visio / Excel SUMIF takes a *range* as its first argument, but
+    the 0.1.0 evaluator evaluates arguments eagerly to scalars so there
+    is no range object to iterate. We support the common scalar case:
+    if ``range_value`` matches ``condition``, return the numeric value
+    of ``sum_value`` (or ``range_value`` when ``sum_value`` is omitted),
+    otherwise ``0.0``. See :func:`_matches_sumif_condition` for the
+    condition grammar.
+    """
+    if _matches_sumif_condition(range_value, condition):
+        target = sum_value if sum_value is not None else range_value
+        return _to_number(target, func="SUMIF")
+    return 0.0
+
+
+# ----------------------------------------------------------------------- geometry
+
+
+def _fn_height(x: FormulaValue = None) -> FormulaValue:
+    """HEIGHT — passthrough for cache-through round-trip fidelity.
+
+    Native Visio treats ``HEIGHT`` as a cell reference; when it shows up
+    in function position (``HEIGHT(expr)``) we return the argument so
+    the formula reconstitutes losslessly. With no argument, returns 0.
+    """
+    return x if x is not None else 0.0
+
+
+def _fn_width(x: FormulaValue = None) -> FormulaValue:
+    """WIDTH — passthrough counterpart to :func:`_fn_height`."""
+    return x if x is not None else 0.0
+
+
+def _fn_pnt(x: FormulaValue, y: FormulaValue) -> Tuple[float, float]:
+    """PNT(x, y) — constructs a 2D point.
+
+    Returns a Python tuple so callers can destructure for later geometry
+    passes. The evaluator's value union is widened at call sites that
+    may observe ``PNT`` output.
+    """
+    return (_to_number(x, func="PNT", arg_index=0), _to_number(y, func="PNT", arg_index=1))
+
+
+def _fn_loctopar(x: FormulaValue) -> FormulaValue:
+    """LOCTOPAR(x) — local-to-parent coordinate transform, passthrough."""
+    return x
+
+
+def _fn_partoloc(x: FormulaValue) -> FormulaValue:
+    """PARTOLOC(x) — parent-to-local coordinate transform, passthrough."""
+    return x
+
+
 # ----------------------------------------------------------------------- registry
 
 
@@ -560,6 +669,12 @@ def _register_all() -> None:
         ("MINMAX", _fn_minmax, 3, 3),
         ("TRUE", _fn_true, 0, 0),
         ("FALSE", _fn_false, 0, 0),
+        ("SUMIF", _fn_sumif, 2, 3),
+        ("HEIGHT", _fn_height, 0, 1),
+        ("WIDTH", _fn_width, 0, 1),
+        ("PNT", _fn_pnt, 2, 2),
+        ("LOCTOPAR", _fn_loctopar, 1, 1),
+        ("PARTOLOC", _fn_partoloc, 1, 1),
     ]
     for name, func, lo, hi in entries:
         BUILTINS[name] = BuiltinFunction(name, func, lo, hi)
