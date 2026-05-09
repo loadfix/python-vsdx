@@ -126,3 +126,32 @@ class CT_PageContents(BaseOxmlElement):
 
     shapes = ZeroOrOne("vsdx:Shapes")
     connects = ZeroOrOne("vsdx:Connects")
+
+    @property
+    def shapes_element(self):
+        """Return the ``<Shapes>`` child, creating one if absent.
+
+        Proxy-layer convenience. The track-3 :class:`ShapeTree` proxy
+        treats the shapes container as always-present; we create-on-read
+        here so a brand-new page part (whose ``<PageContents/>`` is
+        empty) materialises a ``<Shapes/>`` the first time any shape is
+        appended.
+
+        .. versionadded:: 0.1.0
+        """
+        return self.get_or_add_shapes()
+
+    @property
+    def connects_element(self):
+        """Return the ``<Connects>`` child, creating one if absent.
+
+        Proxy-layer convenience, same pattern as
+        :attr:`shapes_element`. ``<Connects>`` is optional in
+        well-formed Visio XML (pages without connectors legitimately
+        omit it); we create-on-read here so the authoring proxy can
+        append ``<Connect>`` entries without a dance through
+        ``get_or_add_connects``.
+
+        .. versionadded:: 0.1.0
+        """
+        return self.get_or_add_connects()

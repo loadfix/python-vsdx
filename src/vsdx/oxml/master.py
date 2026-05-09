@@ -112,3 +112,15 @@ class CT_MasterContents(BaseOxmlElement):
     """
 
     shapes = ZeroOrOne("vsdx:Shapes")
+
+    @property
+    def shapes_element(self):
+        """Return the ``<Shapes>`` child, creating one if absent.
+
+        Proxy-layer convenience — see
+        :attr:`vsdx.oxml.page.CT_PageContents.shapes_element` for the
+        full rationale (same semantics here on MasterContents).
+
+        .. versionadded:: 0.1.0
+        """
+        return self.get_or_add_shapes()

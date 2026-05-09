@@ -45,3 +45,19 @@ class CT_Shapes(BaseOxmlElement):
 
     # Auto-generates ``shape_lst`` getter on this class.
     shape = ZeroOrMore("vsdx:Shape")
+
+    def add_shape(self, master_name_u=None):
+        """Append a new ``<Shape>`` child and return it.
+
+        Overrides the zero-arg ``add_shape`` xmlchemy autogenerates from
+        the ``ZeroOrMore("vsdx:Shape")`` descriptor with a proxy-friendly
+        keyword variant. When *master_name_u* is supplied, the new
+        ``<Shape>`` carries ``@Master=name_u`` (the convention the proxy
+        uses to look up the registered master at save time).
+
+        .. versionadded:: 0.1.0
+        """
+        shape_el = self._add_shape()
+        if master_name_u is not None:
+            shape_el.set("Master", str(master_name_u))
+        return shape_el
