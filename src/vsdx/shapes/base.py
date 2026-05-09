@@ -22,6 +22,7 @@ from vsdx.util import Inches, Length
 if TYPE_CHECKING:
     from vsdx.geometry import Geometries, Geometry
     from vsdx.oxml._stubs import CT_Cell, CT_Shape  # TODO(vsdx/track-1)
+    from vsdx.shape_data import ShapeData
     from vsdx.shapes.shapetree import ShapeTree
 
 
@@ -315,6 +316,25 @@ class Shape(ParentedElementProxy):
         return self.geometries.add(
             no_fill=no_fill, no_line=no_line, no_show=no_show
         )
+
+    # -- shape data / user-defined properties ---------------------------
+
+    @property
+    def data(self) -> "ShapeData":
+        """The shape's :class:`~vsdx.shape_data.ShapeData` proxy.
+
+        Dict-like over the shape's ``<Section N="Property">`` rows —
+        ``shape.data["Cost"]`` returns the value, ``shape.data.field(
+        "Cost")`` returns the full :class:`~vsdx.shape_data.ShapeDataField`
+        with type / label / format metadata. Shapes without any
+        Property section expose an empty mapping; the section is
+        materialised on first ``add_field`` call.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.shape_data import ShapeData
+
+        return ShapeData(self)
 
     # -- helpers --------------------------------------------------------
 

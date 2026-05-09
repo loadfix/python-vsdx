@@ -64,6 +64,18 @@ from vsdx.geometry import (
 from vsdx.layers import Layer, Layers
 from vsdx.master import Master, Masters
 from vsdx.page import Page, Pages
+from vsdx.shape_data import (
+    PROPERTY_TYPE_BOOLEAN,
+    PROPERTY_TYPE_CURRENCY,
+    PROPERTY_TYPE_DATE,
+    PROPERTY_TYPE_DURATION,
+    PROPERTY_TYPE_FIXED_LIST,
+    PROPERTY_TYPE_NUMBER,
+    PROPERTY_TYPE_STRING,
+    PROPERTY_TYPE_VARIABLE_LIST,
+    ShapeData,
+    ShapeDataField,
+)
 from vsdx.shapes import (
     Connector,
     Ellipse,
@@ -114,6 +126,14 @@ __all__ = [
     "NURBSTo",
     "NS_R",
     "NS_VSDX_CORE",
+    "PROPERTY_TYPE_BOOLEAN",
+    "PROPERTY_TYPE_CURRENCY",
+    "PROPERTY_TYPE_DATE",
+    "PROPERTY_TYPE_DURATION",
+    "PROPERTY_TYPE_FIXED_LIST",
+    "PROPERTY_TYPE_NUMBER",
+    "PROPERTY_TYPE_STRING",
+    "PROPERTY_TYPE_VARIABLE_LIST",
     "Page",
     "Pages",
     "Paragraph",
@@ -133,6 +153,8 @@ __all__ = [
     "Rectangle",
     "Run",
     "Shape",
+    "ShapeData",
+    "ShapeDataField",
     "ShapeTree",
     "SplineKnot",
     "SplineStart",

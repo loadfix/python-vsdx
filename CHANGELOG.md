@@ -6,6 +6,51 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — shape data / user-defined properties (R8-3)
+
+- **`vsdx.shape_data.ShapeData`** — dict-like proxy over the shape's
+  ``<Section N="Property">``. Accessed via **`Shape.data`**. Supports
+  ``shape.data["Cost"]`` typed-value lookup, iteration over property
+  names, ``in`` / ``len`` / ``del`` operators, and ``.get(name, default)``
+  / ``.get_field(name)`` graceful-miss variants.
+- **`vsdx.shape_data.ShapeDataField`** — per-property proxy exposing
+  `.name`, `.label`, `.type`, `.value`, `.raw_value`, `.format`,
+  `.prompt`, `.sort_key`, `.invisible` accessors. `.value` coerces
+  per the Visio ``<Cell N="Type">`` code — String/FixedList/VariableList
+  to `str`, Number/Currency to `float`, Boolean to `bool` (tolerating
+  TRUE/FALSE tokens on read, emitting 0/1 on write), Date/Duration
+  passed through as `str`.
+- **`ShapeData.add_field(name, value, *, label=None, type=0, format=None,
+  prompt=None, sort_key=None, invisible=False)`** — appends a new
+  ``<Row>`` with cells emitted in Visio-canonical order. Materialises
+  the ``<Section N="Property">`` on first call. Rejects duplicate /
+  empty names. Label defaults to *name* when omitted.
+- **`ShapeData.remove_field(name)`** — deletes a property row;
+  preserves the Section element even when the last row is removed
+  for round-trip byte-identity on re-add.
+- **Type-code constants** — `PROPERTY_TYPE_STRING` (0),
+  `PROPERTY_TYPE_FIXED_LIST` (1), `PROPERTY_TYPE_NUMBER` (2),
+  `PROPERTY_TYPE_BOOLEAN` (3), `PROPERTY_TYPE_VARIABLE_LIST` (4),
+  `PROPERTY_TYPE_DATE` (5), `PROPERTY_TYPE_DURATION` (6),
+  `PROPERTY_TYPE_CURRENCY` (7).
+- **Zero new `CT_*` classes** — reuses the existing `CT_Section` /
+  `CT_Row` / `CT_Cell` trio with value-level dispatch on
+  ``section.@N == "Property"`` and ``row.@N`` for the field name.
+  Matches the R4-12 geometry pattern.
+
+### Tests
+
+- **36 shape-data unit tests** (`tests/unit/test_shape_data.py`):
+  Mapping surface (get / iter / contains / len / del / get / get_field),
+  ``add_field`` authoring (duplicate / empty-name rejection, label
+  default, format / prompt / sort_key / invisible propagation, Type
+  cell emission), typed-coercion round-trips for every Visio type
+  code (String, FixedList, Number, Boolean with 1/0 + TRUE/FALSE
+  tolerance, VariableList, Date, Duration, Currency, plus missing-
+  Value and missing-Type defaults), mutation (`__setitem__` /
+  ``remove_field`` / ``del`` / metadata setters), and parse-existing
+  fixture round-trips.
+
 ### Added — custom geometry (R4-12, scoping §4.3 / §4.4)
 
 - **`vsdx.geometry.Geometry`** and **`vsdx.geometry.Geometries`** —
