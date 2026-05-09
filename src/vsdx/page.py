@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Iterator, Optional
 
 from vsdx.shapes.shapetree import ShapeTree
 from vsdx.shared import ParentedElementProxy, PartElementProxy
+from vsdx.theme import Theme
 from vsdx.util import Inches, Length, lazyproperty
 
 if TYPE_CHECKING:
@@ -400,6 +401,60 @@ class Page(PartElementProxy):
                 "background page has no NameU; assign a name first"
             )
         self._element.set("BackPage", target_name)
+
+    # -- theme override -------------------------------------------------
+
+    @property
+    def theme(self) -> Optional[Theme]:
+        """The theme effective on this page.
+
+        When the page carries a direct ``RT.THEME`` relationship to a
+        :class:`~vsdx.parts.theme.ThemePart` (a "per-page theme
+        override" — Visio's mechanism for pages that diverge from the
+        document-wide theme), this returns a :class:`Theme` proxy
+        wrapping *that* part. Otherwise it falls back to the
+        document-wide :attr:`~vsdx.document.VisioDocument.theme`,
+        returning ``None`` only when the package has no theme at all.
+
+        Assigning a :class:`Theme` establishes (or replaces) the
+        per-page override rel. Assigning ``None`` removes the override
+        rel so the page inherits the document theme again.
+
+        .. versionadded:: 0.3.0
+        """
+        from ooxml_opc import RELATIONSHIP_TYPE as RT
+
+        from vsdx.parts.theme import ThemePart
+
+        for rel in self._page_part.rels.values():
+            if rel.is_external or rel.reltype != RT.THEME:
+                continue
+            target = rel.target_part
+            if isinstance(target, ThemePart):
+                return Theme(target)
+        doc = self._parent._parent  # Pages → VisioDocument
+        return doc.theme
+
+    @theme.setter
+    def theme(self, value: Optional[Theme]) -> None:
+        from ooxml_opc import RELATIONSHIP_TYPE as RT
+
+        from vsdx.parts.theme import ThemePart
+
+        # Drop any existing override rel first.
+        for rId, rel in list(self._page_part.rels.items()):
+            if rel.is_external or rel.reltype != RT.THEME:
+                continue
+            target = rel.target_part
+            if isinstance(target, ThemePart):
+                del self._page_part.rels[rId]
+        if value is None:
+            return
+        if not isinstance(value, Theme):
+            raise TypeError(
+                "Page.theme setter expects a Theme or None, got %r" % type(value).__name__
+            )
+        self._page_part.relate_to(value.part, RT.THEME)
 
     # -- navigation -----------------------------------------------------
 

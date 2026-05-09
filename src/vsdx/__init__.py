@@ -94,7 +94,7 @@ from vsdx.shapes import (
     Triangle,
 )
 from vsdx.text import Paragraph, Run, TextFrame
-from vsdx.theme import Theme
+from vsdx.theme import ColorScheme, FontScheme, Theme
 from vsdx.util import Cm, Emu, Inches, Length, Mm, Pt
 
 __version__ = "0.2.0.dev0"
@@ -114,6 +114,7 @@ __all__ = [
     "ArcTo",
     "CONNECTION_TYPE",
     "Cm",
+    "ColorScheme",
     "ConnectionPoint",
     "ConnectionPoints",
     "Connector",
@@ -123,6 +124,7 @@ __all__ = [
     "Ellipse",
     "EllipticalArcTo",
     "Emu",
+    "FontScheme",
     "Geometries",
     "Geometry",
     "GeometryRow",

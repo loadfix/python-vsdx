@@ -6,6 +6,57 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — theme proxies + per-page theme overrides (R8-14)
+
+- **`vsdx.theme.ColorScheme`** — dotted-attribute proxy over the
+  ``<a:clrScheme>`` element. Exposes the twelve canonical DrawingML
+  colour slots (``dk1`` / ``lt1`` / ``dk2`` / ``lt2`` /
+  ``accent1``–``accent6`` / ``hlink`` / ``folHlink``) as read-only
+  properties returning a six-hex-digit RGB string for ``<a:srgbClr>``
+  slots, the raw system-colour name (``"windowText"`` / ``"window"``)
+  for ``<a:sysClr>`` slots, or ``None`` when the slot is absent /
+  wraps a ``<a:schemeClr>``. ``.name`` surfaces the scheme's
+  ``@name`` attribute.
+- **`vsdx.theme.FontScheme`** — dotted-attribute proxy over the
+  ``<a:fontScheme>`` element. Exposes ``.name``, ``.major_font``,
+  and ``.minor_font`` — the last two are internal
+  ``_ThemeFont`` proxies with ``.latin_typeface`` over
+  ``a:latin@typeface``.
+- **`vsdx.theme.Theme.color_scheme`** — returns the
+  :class:`ColorScheme` proxy for this theme, or ``None`` when the
+  theme has no ``<a:clrScheme>``.
+- **`vsdx.theme.Theme.font_scheme`** — returns the
+  :class:`FontScheme` proxy, or ``None`` when the theme has no
+  ``<a:fontScheme>``.
+- **`vsdx.document.VisioDocument.themes`** — list of every
+  :class:`Theme` proxy in the package (each
+  :class:`~vsdx.parts.theme.ThemePart` reachable from the package).
+  Returns an empty list for fresh packages until seed-template
+  injection (track 4) lands.
+- **`vsdx.page.Page.theme`** — getter returns the theme effective
+  on this page: the per-page override theme (an ``RT.THEME`` rel on
+  the page part) when present, else the document-wide theme
+  (:attr:`VisioDocument.theme`), else ``None``. Setter accepts a
+  :class:`Theme` (establishes/replaces the override rel) or ``None``
+  (removes the override so the page inherits the document theme
+  again). ``TypeError`` on any other value.
+- **`vsdx.ColorScheme` / `vsdx.FontScheme`** — public re-exports on
+  the top-level ``vsdx`` namespace.
+
+### Tests — theme proxies + per-page overrides
+
+- **26 additional unit tests** (`tests/unit/test_theme.py`):
+  ``ColorScheme`` slot coverage (srgb values normalised to
+  uppercase hex, sysClr values surfaced as the raw ``@val`` name,
+  ``None`` for bare themes), ``FontScheme`` major/minor latin
+  typeface reads, round-trip via ``Theme.set_color`` reflected
+  through the proxy, ``VisioDocument.themes`` enumeration of
+  document-scoped plus per-page theme parts, ``Page.theme``
+  document-fallback / per-page-override reads, setter creating
+  and replacing the page's ``RT.THEME`` rel, setter ``None``
+  removing the rel, and ``TypeError`` on non-``Theme``
+  assignments.
+
 ### Added — page scale + print setup (R8-6, R8-7)
 
 - **`vsdx.page.Page.page_scale`** / **`Page.drawing_scale`** — float

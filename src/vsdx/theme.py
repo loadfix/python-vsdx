@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     pass
 
 
-__all__ = ["Theme"]
+__all__ = ["ColorScheme", "FontScheme", "Theme"]
 
 
 _NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -91,6 +91,35 @@ class Theme:
         self._theme_part.name = value
 
     # -- colour scheme ------------------------------------------------
+
+    @property
+    def color_scheme(self) -> "Optional[ColorScheme]":
+        """The :class:`ColorScheme` proxy, or ``None`` when the theme has
+        no ``<a:clrScheme>`` child.
+
+        The proxy exposes the twelve canonical DrawingML colour slots
+        (``dk1`` / ``lt1`` / ``dk2`` / ``lt2`` / ``accent1``-``accent6``
+        / ``hlink`` / ``folHlink``) as dotted-attribute accessors
+        returning an RGB-hex string, a system-colour name, or ``None``.
+
+        .. versionadded:: 0.3.0
+        """
+        clr = self._theme_part.color_scheme()
+        if clr is None:
+            return None
+        return ColorScheme(self._theme_part, clr)
+
+    @property
+    def font_scheme(self) -> "Optional[FontScheme]":
+        """The :class:`FontScheme` proxy, or ``None`` when the theme has
+        no ``<a:fontScheme>`` child.
+
+        .. versionadded:: 0.3.0
+        """
+        fs = self._theme_part.font_scheme()
+        if fs is None:
+            return None
+        return FontScheme(self._theme_part, fs)
 
     @property
     def color_scheme_name(self) -> Optional[str]:
@@ -305,3 +334,156 @@ class Theme:
         except ValueError as exc:
             raise ValueError(f"rgb must be 6 hex digits, got {rgb!r}") from exc
         return value.upper()
+
+
+class ColorScheme:
+    """Dotted-attribute proxy over an ``<a:clrScheme>`` element.
+
+    Exposes the twelve canonical DrawingML colour slots as properties:
+    ``dk1``, ``lt1``, ``dk2``, ``lt2``, ``accent1``-``accent6``,
+    ``hlink``, ``folHlink``. Each property returns:
+
+    - the six-hex-digit ``@val`` string (uppercase) when the slot
+      wraps an ``<a:srgbClr>``;
+    - the raw ``@val`` (e.g. ``"windowText"``) when the slot wraps an
+      ``<a:sysClr>`` — Office's Office theme uses this for ``dk1`` /
+      ``lt1``;
+    - ``None`` when the slot is missing or wraps a ``<a:schemeClr>``
+      (self-referential and semantically empty in a theme context).
+
+    :attr:`name` surfaces the ``@name`` attribute of the scheme
+    element. Obtained via :attr:`Theme.color_scheme`.
+
+    .. versionadded:: 0.3.0
+    """
+
+    def __init__(self, theme_part: ThemePart, element) -> None:  # type: ignore[no-untyped-def]
+        self._theme_part = theme_part
+        self._element = element
+
+    @property
+    def name(self) -> Optional[str]:
+        """The ``<a:clrScheme>@name`` attribute, or ``None`` if unset."""
+        value = self._element.get("name")
+        return None if value is None else str(value)
+
+    def _slot_value(self, slot: str) -> Optional[str]:
+        """Return the RGB-hex or sysClr name for slot `slot`, or ``None``."""
+        slot_el = self._element.find(_qn(f"a:{slot}"))
+        if slot_el is None:
+            return None
+        srgb = slot_el.find(_qn("a:srgbClr"))
+        if srgb is not None:
+            val = srgb.get("val")
+            return None if val is None else str(val).upper()
+        sysclr = slot_el.find(_qn("a:sysClr"))
+        if sysclr is not None:
+            val = sysclr.get("val")
+            return None if val is None else str(val)
+        return None
+
+    @property
+    def dk1(self) -> Optional[str]:
+        return self._slot_value("dk1")
+
+    @property
+    def lt1(self) -> Optional[str]:
+        return self._slot_value("lt1")
+
+    @property
+    def dk2(self) -> Optional[str]:
+        return self._slot_value("dk2")
+
+    @property
+    def lt2(self) -> Optional[str]:
+        return self._slot_value("lt2")
+
+    @property
+    def accent1(self) -> Optional[str]:
+        return self._slot_value("accent1")
+
+    @property
+    def accent2(self) -> Optional[str]:
+        return self._slot_value("accent2")
+
+    @property
+    def accent3(self) -> Optional[str]:
+        return self._slot_value("accent3")
+
+    @property
+    def accent4(self) -> Optional[str]:
+        return self._slot_value("accent4")
+
+    @property
+    def accent5(self) -> Optional[str]:
+        return self._slot_value("accent5")
+
+    @property
+    def accent6(self) -> Optional[str]:
+        return self._slot_value("accent6")
+
+    @property
+    def hlink(self) -> Optional[str]:
+        return self._slot_value("hlink")
+
+    @property
+    def folHlink(self) -> Optional[str]:
+        return self._slot_value("folHlink")
+
+
+class _ThemeFont:
+    """Proxy over ``<a:majorFont>`` or ``<a:minorFont>``.
+
+    Exposes :attr:`latin_typeface` over ``a:latin@typeface``.
+
+    .. versionadded:: 0.3.0
+    """
+
+    def __init__(self, element) -> None:  # type: ignore[no-untyped-def]
+        self._element = element
+
+    @property
+    def latin_typeface(self) -> Optional[str]:
+        """The ``a:latin@typeface``, or ``None`` when absent."""
+        latin = self._element.find(_qn("a:latin"))
+        if latin is None:
+            return None
+        value = latin.get("typeface")
+        return None if value is None else str(value)
+
+
+class FontScheme:
+    """Dotted-attribute proxy over an ``<a:fontScheme>`` element.
+
+    Exposes :attr:`major_font` and :attr:`minor_font` as
+    :class:`_ThemeFont` proxies with ``.latin_typeface`` access.
+    :attr:`name` returns the scheme's ``@name`` attribute.
+
+    .. versionadded:: 0.3.0
+    """
+
+    def __init__(self, theme_part: ThemePart, element) -> None:  # type: ignore[no-untyped-def]
+        self._theme_part = theme_part
+        self._element = element
+
+    @property
+    def name(self) -> Optional[str]:
+        """The ``<a:fontScheme>@name`` attribute, or ``None`` if unset."""
+        value = self._element.get("name")
+        return None if value is None else str(value)
+
+    @property
+    def major_font(self) -> Optional[_ThemeFont]:
+        """The :class:`_ThemeFont` proxy over ``<a:majorFont>``, or ``None``."""
+        mf = self._element.find(_qn("a:majorFont"))
+        if mf is None:
+            return None
+        return _ThemeFont(mf)
+
+    @property
+    def minor_font(self) -> Optional[_ThemeFont]:
+        """The :class:`_ThemeFont` proxy over ``<a:minorFont>``, or ``None``."""
+        mf = self._element.find(_qn("a:minorFont"))
+        if mf is None:
+            return None
+        return _ThemeFont(mf)

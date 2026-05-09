@@ -127,6 +127,11 @@ class VisioDocument(PartElementProxy):
         ``theme = doc.theme`` and fall back to authoring against the
         default colour list when ``None``.
 
+        When the package carries several theme parts (e.g. per-page
+        theme overrides at ``/visio/theme/theme2.xml``), this returns
+        the theme related from the document part — i.e. the
+        package-wide default. Use :attr:`themes` to enumerate them all.
+
         .. versionadded:: 0.1.0
         """
         document_part = cast("VisioDocumentPart", self._package.document_part)
@@ -134,6 +139,28 @@ class VisioDocument(PartElementProxy):
         if theme_part is None:
             return None
         return Theme(theme_part)
+
+    @property
+    def themes(self) -> list[Theme]:
+        """Every theme part in the package, wrapped as :class:`Theme`.
+
+        Walks every :class:`~vsdx.parts.theme.ThemePart` reachable from
+        the package (regardless of what relates to it) and returns the
+        matching proxy in package-iteration order. An empty list is
+        returned when the package has no theme parts — authored-from-
+        scratch packages until seed-template injection (track 4) lands.
+
+        Order is *not* guaranteed to match partname order; callers that
+        care about theme1 / theme2 ordering should sort by
+        ``theme.part.partname``.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.parts.theme import ThemePart
+
+        return [
+            Theme(p) for p in self._package.iter_parts() if isinstance(p, ThemePart)
+        ]
 
     # -- convenience ----------------------------------------------------
 

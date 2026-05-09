@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import pytest
 from ooxml_opc import OpcPackage
+from ooxml_opc import RELATIONSHIP_TYPE as RT
 
+import vsdx
 from vsdx.parts.theme import ThemePart
-from vsdx.theme import Theme
+from vsdx.theme import ColorScheme, FontScheme, Theme
 
 _THEME_XML = (
     b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
@@ -238,3 +240,197 @@ class DescribeThemeRoundTrip:
         assert b"Brand" in blob
         # DrawingML namespace preserved on round-trip.
         assert b"http://schemas.openxmlformats.org/drawingml/2006/main" in blob
+
+
+class DescribeColorSchemeProxy:
+    def it_is_returned_from_theme_color_scheme(self) -> None:
+        proxy = _theme_from(_THEME_XML)
+        scheme = proxy.color_scheme
+        assert isinstance(scheme, ColorScheme)
+        assert scheme.name == "Office"
+
+    def it_returns_none_when_the_theme_has_no_scheme(self) -> None:
+        proxy = _theme_from(_BARE_THEME_XML)
+        assert proxy.color_scheme is None
+
+    @pytest.mark.parametrize(
+        ("slot", "expected"),
+        [
+            ("dk2", "1F497D"),
+            ("lt2", "EEECE1"),
+            ("accent1", "4F81BD"),
+            ("accent2", "C0504D"),
+            ("accent3", "9BBB59"),
+            ("accent4", "8064A2"),
+            ("accent5", "4BACC6"),
+            ("accent6", "F79646"),
+            ("hlink", "0000FF"),
+            ("folHlink", "800080"),
+        ],
+    )
+    def it_exposes_srgb_slots_as_dotted_attributes(
+        self, slot: str, expected: str
+    ) -> None:
+        scheme = _theme_from(_THEME_XML).color_scheme
+        assert scheme is not None
+        assert getattr(scheme, slot) == expected
+
+    def it_returns_the_sysClr_val_for_system_colour_slots(self) -> None:
+        scheme = _theme_from(_THEME_XML).color_scheme
+        assert scheme is not None
+        # The Office theme's dk1 / lt1 slots wrap a:sysClr — the proxy
+        # surfaces the sysClr @val (e.g. "windowText") rather than
+        # collapsing to None (that's the documented contract).
+        assert scheme.dk1 == "windowText"
+        assert scheme.lt1 == "window"
+
+    def it_round_trips_a_colour_slot_via_set_color(self) -> None:
+        theme = _theme_from(_THEME_XML)
+        theme.set_color("accent1", "ff00aa")
+
+        scheme = theme.color_scheme
+        assert scheme is not None
+        assert scheme.accent1 == "FF00AA"
+
+
+class DescribeFontSchemeProxy:
+    def it_is_returned_from_theme_font_scheme(self) -> None:
+        proxy = _theme_from(_THEME_XML)
+        fs = proxy.font_scheme
+        assert isinstance(fs, FontScheme)
+        assert fs.name == "Office"
+
+    def it_returns_none_when_the_theme_has_no_font_scheme(self) -> None:
+        proxy = _theme_from(_BARE_THEME_XML)
+        assert proxy.font_scheme is None
+
+    def it_exposes_major_and_minor_font_latin_typefaces(self) -> None:
+        fs = _theme_from(_THEME_XML).font_scheme
+        assert fs is not None
+        major = fs.major_font
+        minor = fs.minor_font
+        assert major is not None
+        assert minor is not None
+        assert major.latin_typeface == "Calibri Light"
+        assert minor.latin_typeface == "Calibri"
+
+
+# -- per-page theme override + document.themes ----------------------
+
+
+def _attach_doc_theme(doc: "vsdx.VisioDocument", xml: bytes) -> ThemePart:
+    """Create a ThemePart inside *doc*'s package and rel it to the document."""
+    part = ThemePart.new(doc.package, xml)
+    doc.package.document_part.relate_to(part, RT.THEME)
+    return part
+
+
+class DescribeVisioDocumentThemes:
+    def it_returns_an_empty_list_for_a_fresh_package(self) -> None:
+        doc = vsdx.Visio()
+        assert doc.themes == []
+
+    def it_lists_every_theme_part_in_the_package(self) -> None:
+        doc = vsdx.Visio()
+        _attach_doc_theme(doc, _THEME_XML)
+        # Second (unrelated) theme part — simulating a per-page override.
+        extra = ThemePart.new(doc.package, _BARE_THEME_XML)
+        page = doc.pages.add_page(name="Page-1")
+        page.part.relate_to(extra, RT.THEME)
+
+        themes = doc.themes
+        assert len(themes) == 2
+        assert all(isinstance(t, Theme) for t in themes)
+        # The original theme is the document-scoped default.
+        assert doc.theme is not None
+        assert doc.theme.part is themes[0].part or doc.theme.part is themes[1].part
+
+
+class DescribePageThemeOverride:
+    def it_falls_back_to_the_document_theme_when_no_override(self) -> None:
+        doc = vsdx.Visio()
+        _attach_doc_theme(doc, _THEME_XML)
+
+        page = doc.pages.add_page(name="Page-1")
+
+        assert page.theme is not None
+        assert page.theme.name == "Office Theme"
+        # Same underlying part as the document-wide theme.
+        assert page.theme.part is doc.theme.part
+
+    def it_returns_none_when_the_package_has_no_theme(self) -> None:
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="Page-1")
+        assert page.theme is None
+
+    def it_reads_an_override_bound_to_the_page_part(self) -> None:
+        doc = vsdx.Visio()
+        _attach_doc_theme(doc, _THEME_XML)
+        override_part = ThemePart.new(doc.package, _BARE_THEME_XML)
+
+        page = doc.pages.add_page(name="Page-1")
+        page.part.relate_to(override_part, RT.THEME)
+
+        assert page.theme is not None
+        assert page.theme.part is override_part
+        # Different part than the document-wide theme.
+        assert page.theme.part is not doc.theme.part
+
+    def it_can_set_a_per_page_theme_override(self) -> None:
+        doc = vsdx.Visio()
+        _attach_doc_theme(doc, _THEME_XML)
+        page = doc.pages.add_page(name="Page-1")
+        override = Theme(ThemePart.new(doc.package, _BARE_THEME_XML))
+
+        page.theme = override
+
+        # The page part now carries exactly one RT.THEME rel — to override.
+        theme_rels = [
+            r for r in page.part.rels.values()
+            if not r.is_external and r.reltype == RT.THEME
+        ]
+        assert len(theme_rels) == 1
+        assert theme_rels[0].target_part is override.part
+        assert page.theme is not None
+        assert page.theme.part is override.part
+
+    def it_replaces_any_existing_override_on_set(self) -> None:
+        doc = vsdx.Visio()
+        _attach_doc_theme(doc, _THEME_XML)
+        page = doc.pages.add_page(name="Page-1")
+        first = Theme(ThemePart.new(doc.package, _BARE_THEME_XML))
+        second = Theme(ThemePart.new(doc.package, _BARE_THEME_XML))
+
+        page.theme = first
+        page.theme = second
+
+        theme_rels = [
+            r for r in page.part.rels.values()
+            if not r.is_external and r.reltype == RT.THEME
+        ]
+        assert len(theme_rels) == 1
+        assert theme_rels[0].target_part is second.part
+
+    def it_removes_the_override_when_set_to_none(self) -> None:
+        doc = vsdx.Visio()
+        _attach_doc_theme(doc, _THEME_XML)
+        page = doc.pages.add_page(name="Page-1")
+        override = Theme(ThemePart.new(doc.package, _BARE_THEME_XML))
+        page.theme = override
+
+        page.theme = None
+
+        theme_rels = [
+            r for r in page.part.rels.values()
+            if not r.is_external and r.reltype == RT.THEME
+        ]
+        assert theme_rels == []
+        # The page falls back to the document theme.
+        assert page.theme is not None
+        assert page.theme.part is doc.theme.part
+
+    def it_rejects_non_theme_non_none_assignments(self) -> None:
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="Page-1")
+        with pytest.raises(TypeError, match="Theme or None"):
+            page.theme = "nope"  # type: ignore[assignment]
