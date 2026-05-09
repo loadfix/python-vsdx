@@ -20,6 +20,7 @@ from vsdx.text import TextFrame
 from vsdx.util import Inches, Length
 
 if TYPE_CHECKING:
+    from vsdx.connection_points import ConnectionPoints
     from vsdx.geometry import Geometries, Geometry
     from vsdx.hyperlinks import HyperlinkCollection
     from vsdx.oxml._stubs import CT_Cell, CT_Shape  # TODO(vsdx/track-1)
@@ -430,6 +431,24 @@ class Shape(ParentedElementProxy):
         from vsdx.hyperlinks import HyperlinkCollection
 
         return HyperlinkCollection(self)
+
+    # -- connection points ---------------------------------------------
+
+    @property
+    def connection_points(self) -> "ConnectionPoints":
+        """The shape's :class:`~vsdx.connection_points.ConnectionPoints` proxy.
+
+        List-like over the shape's ``<Section N="Connection">`` rows —
+        ``shape.connection_points[0]`` returns the first point,
+        ``shape.connection_points.add(x, y)`` appends a new one.
+        Shapes without any Connection section expose an empty
+        sequence; the section is materialised on first ``add`` call.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.connection_points import ConnectionPoints
+
+        return ConnectionPoints(self)
 
     # -- helpers --------------------------------------------------------
 

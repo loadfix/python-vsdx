@@ -62,6 +62,48 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   `VisioDocument.hyperlink_base` (fresh = None, settable, DocumentSheet
   materialisation, update-not-duplicate, None / empty-string clear,
   no-op clear on empty); repr strings.
+### Added — connection points (R8-17)
+
+- **`vsdx.connection_points.ConnectionPoints`** — list-like proxy over
+  the shape's ``<Section N="Connection">``. Accessed via
+  **`Shape.connection_points`**. Supports
+  ``shape.connection_points[i]`` indexed lookup, iteration in ``@IX``
+  order, ``len``, and ``shape.connection_points.add(x, y, *,
+  dir_x=0, dir_y=0, type=CONNECTION_TYPE.INWARD, auto_gen=False)`` /
+  ``remove(index)`` authoring.
+- **`vsdx.connection_points.ConnectionPoint`** — per-row proxy
+  exposing `.index`, `.x`, `.y`, `.dir_x`, `.dir_y`, `.type`,
+  `.auto_gen` accessors. Coordinates emitted with the ``IN`` unit;
+  Type cell always materialised on authoring for fixture-corpus
+  byte-identity.
+- **`vsdx.connection_points.CONNECTION_TYPE`** — ``str``-enum
+  mirroring the ``<Cell N="Type">`` ``@V``: ``INWARD`` (``"0"``),
+  ``OUTWARD`` (``"1"``), ``INWARD_OUTWARD`` (``"2"``). ``.add()`` /
+  ``.type =`` accept the enum, raw ``"0"``/``"1"``/``"2"``, or the
+  integer ``0``/``1``/``2``; unknown codes raise ``ValueError`` on
+  authoring and fall back to ``INWARD`` on parse (load-preserve-save
+  invariant).
+- **`AutoGen` round-trip** — the ``<Cell N="AutoGen">`` flag is
+  preserved verbatim on parse and authored only when explicitly set
+  to ``True`` (absence and ``V="0"`` both read as ``False``).
+- **Zero new `CT_*` classes** — reuses the existing `CT_Section` /
+  `CT_Row` / `CT_Cell` trio with value-level dispatch on
+  ``section.@N == "Connection"`` and ``row.@IX`` for the point's
+  ordinal. Matches the R4-12 geometry / R8-3 shape-data pattern.
+
+### Tests
+
+- **30 connection-point unit tests** (`tests/unit/test_connection_points.py`):
+  Sequence surface (index / iter / len / empty-on-fresh-shape),
+  ``add`` authoring (static/inward default, dynamic/outward + DirX/DirY,
+  inward-outward, integer + string + enum type codes, auto-gen flag,
+  monotonic ``@IX`` from 1, ``U="IN"`` on coordinate cells, invalid
+  type rejection), typed accessors (coordinate / direction / type /
+  auto-gen getters & setters, invalid-type assignment rejection,
+  ``__repr__``), removal (``remove`` + section preservation +
+  ``IndexError`` on out-of-range), and parse-existing fixture
+  round-trips (mixed inward/outward/inward-outward, missing-Type
+  default, unknown-Type tolerance, parse-mutate-read).
 
 ### Added — shape data / user-defined properties (R8-3)
 
