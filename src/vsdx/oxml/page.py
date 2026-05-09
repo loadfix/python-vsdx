@@ -109,7 +109,20 @@ class CT_Page(BaseOxmlElement):
     view_scale = OptionalAttribute("ViewScale", XsdString)
     view_center_x = OptionalAttribute("ViewCenterX", XsdString)
     view_center_y = OptionalAttribute("ViewCenterY", XsdString)
-    back_page = OptionalAttribute("BackPage", XsdUnsignedInt)
+    # ``@Background="1"`` marks the page as a background page. Absent /
+    # ``"0"`` → foreground page (default). See 0.2.0 scoping doc §5.1.
+    #
+    # .. versionadded:: 0.2.0
+    background = OptionalAttribute("Background", XsdString)
+    # ``@BackPage="NameU"`` on a foreground page names the background
+    # page that renders underneath. **Name reference, not rel-id** —
+    # verified against dave-howard/vsdx 0.6.1. Widened from ``XsdUnsignedInt``
+    # (the 0.1.0 speculation) to ``XsdString``.
+    #
+    # .. versionchanged:: 0.2.0
+    #     Retyped from ``XsdUnsignedInt`` to ``XsdString`` to match real
+    #     Visio-desktop output.
+    back_page = OptionalAttribute("BackPage", XsdString)
 
     pageSheet = ZeroOrOne("vsdx:PageSheet")
     rel = ZeroOrOne("vsdx:Rel")

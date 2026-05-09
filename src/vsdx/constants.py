@@ -24,6 +24,8 @@ __all__ = [
     "CT_VSDX_DRAWING_MAIN",
     "CT_VSDX_DRAWING",
     "CT_VSDX_MACRO_DRAWING_MAIN",
+    "CT_VSDX_MACRO_STENCIL_MAIN",
+    "CT_VSDX_MACRO_TEMPLATE_MAIN",
     "CT_VSDX_TEMPLATE_MAIN",
     "CT_VSDX_STENCIL_MAIN",
     "CT_VSDX_PAGE",
@@ -36,6 +38,7 @@ __all__ = [
     "CT_VSDX_DATACONNECTIONS",
     "CT_VSDX_DATARECORDSETS",
     "CT_VSDX_VALIDATION",
+    "CT_VBA_PROJECT",
     # -- Relationship types --
     "RT_VISIO_DOCUMENT",
     "RT_VISIO_PAGES",
@@ -44,6 +47,11 @@ __all__ = [
     "RT_VISIO_MASTER",
     "RT_VISIO_WINDOWS",
     "RT_VISIO_EXTENSIONS",
+    "RT_VBA_PROJECT",
+    # -- Kind discriminators --
+    "VSDX_KIND_DRAWING",
+    "VSDX_KIND_STENCIL",
+    "VSDX_KIND_TEMPLATE",
 ]
 
 
@@ -79,7 +87,13 @@ CT_VSDX_MACRO_DRAWING_MAIN = (
     "application/vnd.ms-visio.drawing.macroEnabled.main+xml"
 )
 CT_VSDX_TEMPLATE_MAIN = "application/vnd.ms-visio.template.main+xml"
+CT_VSDX_MACRO_TEMPLATE_MAIN = (
+    "application/vnd.ms-visio.template.macroEnabled.main+xml"
+)
 CT_VSDX_STENCIL_MAIN = "application/vnd.ms-visio.stencil.main+xml"
+CT_VSDX_MACRO_STENCIL_MAIN = (
+    "application/vnd.ms-visio.stencil.macroEnabled.main+xml"
+)
 CT_VSDX_PAGE = "application/vnd.ms-visio.page+xml"
 CT_VSDX_PAGES = "application/vnd.ms-visio.pages+xml"
 CT_VSDX_MASTER = "application/vnd.ms-visio.master+xml"
@@ -90,6 +104,14 @@ CT_VSDX_SOLUTIONS = "application/vnd.ms-visio.solutions+xml"
 CT_VSDX_DATACONNECTIONS = "application/vnd.ms-visio.dataConnections+xml"
 CT_VSDX_DATARECORDSETS = "application/vnd.ms-visio.dataRecordSets+xml"
 CT_VSDX_VALIDATION = "application/vnd.ms-visio.validation+xml"
+
+#: The shared VBA-project binary content-type used by every macro-enabled
+#: Office variant (.docm / .pptm / .xlsm / .vsdm / .vssm / .vstm). Declared
+#: locally because python-ooxml-opc does not yet export it; will switch to
+#: re-export when opc learns the constant.
+#:
+#: .. versionadded:: 0.2.0
+CT_VBA_PROJECT = "application/vnd.ms-office.vbaProject"
 
 
 # -- relationship-type constants --------------------------------------------
@@ -114,3 +136,24 @@ RT_VISIO_WINDOWS = (
 RT_VISIO_EXTENSIONS = (
     "http://schemas.microsoft.com/visio/2010/relationships/extensions"
 )
+
+#: Relationship-type URI linking a macro-enabled Visio root part to its
+#: ``/visio/vbaProject.bin`` binary. Reused verbatim from the
+#: docx/pptx/xlsx macro relationship; not Visio-specific.
+#:
+#: .. versionadded:: 0.2.0
+RT_VBA_PROJECT = (
+    "http://schemas.microsoft.com/office/2006/relationships/vbaProject"
+)
+
+
+# -- package-kind discriminators --------------------------------------------
+# Values returned by :func:`vsdx.package.VisioPackage.kind`. Mirrors the
+# pptx `kind` discriminator but extended for Visio's stencil / template
+# variants. Content-type routing lives in :mod:`vsdx.package`.
+#
+# .. versionadded:: 0.2.0
+
+VSDX_KIND_DRAWING = "drawing"
+VSDX_KIND_STENCIL = "stencil"
+VSDX_KIND_TEMPLATE = "template"

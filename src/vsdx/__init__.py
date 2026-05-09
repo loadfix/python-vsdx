@@ -17,13 +17,18 @@ type / namespace identifiers the packaging layer needs.
 
 from __future__ import annotations
 
-from vsdx.api import Visio
+from vsdx.api import Stencil, Template, Visio, VisioPackageOpener
 from vsdx.constants import (
     CT_VSDX_DRAWING_MAIN,
+    CT_VSDX_MACRO_DRAWING_MAIN,
+    CT_VSDX_MACRO_STENCIL_MAIN,
+    CT_VSDX_MACRO_TEMPLATE_MAIN,
     CT_VSDX_MASTER,
     CT_VSDX_MASTERS,
     CT_VSDX_PAGE,
     CT_VSDX_PAGES,
+    CT_VSDX_STENCIL_MAIN,
+    CT_VSDX_TEMPLATE_MAIN,
     CT_VSDX_WINDOWS,
     NS_R,
     NS_VSDX_CORE,
@@ -36,27 +41,44 @@ from vsdx.constants import (
 )
 from vsdx.document import VisioDocument
 from vsdx.enum.shapes import VS_CONNECTOR_STYLE, VS_SHAPE_TYPE
+from vsdx.layers import Layer, Layers
 from vsdx.master import Master, Masters
 from vsdx.page import Page, Pages
-from vsdx.shapes import Connector, Ellipse, Rectangle, Shape, ShapeTree, Triangle
+from vsdx.shapes import (
+    Connector,
+    Ellipse,
+    GroupShape,
+    Rectangle,
+    Shape,
+    ShapeTree,
+    Triangle,
+)
 from vsdx.text import Paragraph, Run, TextFrame
 from vsdx.theme import Theme
 from vsdx.util import Cm, Emu, Inches, Length, Mm, Pt
 
-__version__ = "0.1.0.dev0"
+__version__ = "0.2.0.dev0"
 
 __all__ = [
     "CT_VSDX_DRAWING_MAIN",
+    "CT_VSDX_MACRO_DRAWING_MAIN",
+    "CT_VSDX_MACRO_STENCIL_MAIN",
+    "CT_VSDX_MACRO_TEMPLATE_MAIN",
     "CT_VSDX_MASTER",
     "CT_VSDX_MASTERS",
     "CT_VSDX_PAGE",
     "CT_VSDX_PAGES",
+    "CT_VSDX_STENCIL_MAIN",
+    "CT_VSDX_TEMPLATE_MAIN",
     "CT_VSDX_WINDOWS",
     "Cm",
     "Connector",
     "Ellipse",
     "Emu",
+    "GroupShape",
     "Inches",
+    "Layer",
+    "Layers",
     "Length",
     "Master",
     "Masters",
@@ -77,6 +99,8 @@ __all__ = [
     "Run",
     "Shape",
     "ShapeTree",
+    "Stencil",
+    "Template",
     "TextFrame",
     "Theme",
     "Triangle",
@@ -84,5 +108,6 @@ __all__ = [
     "VS_SHAPE_TYPE",
     "Visio",
     "VisioDocument",
+    "VisioPackageOpener",
     "__version__",
 ]

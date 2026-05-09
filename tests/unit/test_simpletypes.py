@@ -8,6 +8,7 @@ from vsdx.oxml.simpletypes import (
     ST_BaseID,
     ST_Boolean,
     ST_FormulaString,
+    ST_LayerMember,
     ST_LineStyle,
     ST_RowType,
     ST_SectionName,
@@ -146,3 +147,34 @@ class Describe_ST_UniqueID:
     def but_it_rejects_the_empty_string(self) -> None:
         with pytest.raises(ValueError):
             ST_UniqueID.validate("")
+
+
+class Describe_ST_LayerMember:
+    """Tests for the 0.2.0 LayerMember cell-value simple type."""
+
+    def it_accepts_a_single_index(self) -> None:
+        ST_LayerMember.validate("0")
+
+    def it_accepts_multi_layer_membership(self) -> None:
+        ST_LayerMember.validate("0,2,5")
+
+    def it_accepts_empty_string_as_no_membership(self) -> None:
+        # Empty-string is how Visio spells "shape is on no layers"
+        # when the cell exists but carries no value.
+        ST_LayerMember.validate("")
+
+    def but_it_rejects_whitespace_separators(self) -> None:
+        with pytest.raises(ValueError):
+            ST_LayerMember.validate("0, 2, 5")
+
+    def and_it_rejects_non_numeric_indices(self) -> None:
+        with pytest.raises(ValueError):
+            ST_LayerMember.validate("0,foo")
+
+    def and_it_rejects_negative_indices(self) -> None:
+        with pytest.raises(ValueError):
+            ST_LayerMember.validate("-1")
+
+    def and_it_rejects_trailing_commas(self) -> None:
+        with pytest.raises(ValueError):
+            ST_LayerMember.validate("0,")

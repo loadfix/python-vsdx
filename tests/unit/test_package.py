@@ -160,6 +160,12 @@ class DescribeVisioPartTypeRegistration:
 
     def it_covers_every_visio_content_type_in_the_scoping_doc(self) -> None:
         # -- guard against silent drift in VISIO_PART_TYPE_MAP by spot- --
-        # -- checking every key is a vnd.ms-visio.* or shared theme type --
+        # -- checking every key is a recognised family. 0.2.0 added the --
+        # -- vbaProject binary for macro-enabled variants (.vsdm /      --
+        # -- .vssm / .vstm), which lives under ``vnd.ms-office.``.      --
         for ct in VISIO_PART_TYPE_MAP:
-            assert ct.startswith("application/vnd.ms-visio.") or ct == CT.OFC_THEME
+            assert (
+                ct.startswith("application/vnd.ms-visio.")
+                or ct == CT.OFC_THEME
+                or ct == "application/vnd.ms-office.vbaProject"
+            ), f"unexpected CT in map: {ct}"
