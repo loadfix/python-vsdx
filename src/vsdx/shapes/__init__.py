@@ -19,11 +19,13 @@ from __future__ import annotations
 from vsdx.shapes.base import Shape, TextShape
 from vsdx.shapes.autoshape import Ellipse, Rectangle, Triangle
 from vsdx.shapes.connector import Connector
+from vsdx.shapes.group import GroupShape
 from vsdx.shapes.shapetree import ShapeTree
 
 __all__ = [
     "Connector",
     "Ellipse",
+    "GroupShape",
     "Rectangle",
     "Shape",
     "ShapeTree",

@@ -21,6 +21,7 @@ from vsdx.util import Inches, Length, lazyproperty
 
 if TYPE_CHECKING:
     from vsdx.document import VisioDocument
+    from vsdx.layers import Layers
     from vsdx.oxml._stubs import CT_Page  # TODO(vsdx/track-1)
     from vsdx.parts._stubs import PagePart, PagesPart  # TODO(vsdx/track-2)
 
@@ -78,6 +79,96 @@ class Page(PartElementProxy):
         """Allocate a fresh ``@ID`` for a new shape on this page."""
         return self._page_part.allocate_shape_id()
 
+    # -- layers ---------------------------------------------------------
+
+    @lazyproperty
+    def layers(self) -> "Layers":
+        """:class:`~vsdx.layers.Layers` collection over this page's
+        ``<Section N="Layer">``.
+
+        Iteration yields zero :class:`~vsdx.layers.Layer` proxies when
+        the page has no layer section yet — adding the first layer
+        materialises the section on demand.
+
+        .. versionadded:: 0.2.0
+        """
+        # Local import dodges the page <-> layers cycle; layers imports
+        # vsdx.shapes.base which imports vsdx.text which imports …
+        from vsdx.layers import Layers
+
+        return Layers(self)
+
+    # -- background-page semantics --------------------------------------
+
+    @property
+    def is_background(self) -> bool:
+        """``True`` if this page is a background page (``@Background="1"``).
+
+        Background pages are never displayed in Visio desktop's page-tab
+        strip — they are only rendered when a foreground page references
+        them via :attr:`background_page`. See 0.2.0 scoping doc §5.1.
+
+        .. versionadded:: 0.2.0
+        """
+        val = self._element.get("Background")
+        return val == "1"
+
+    @is_background.setter
+    def is_background(self, value: bool) -> None:
+        if value:
+            self._element.set("Background", "1")
+        else:
+            self._element.attrib.pop("Background", None)
+
+    @property
+    def background_page(self) -> Optional["Page"]:
+        """The background page referenced by this page, or ``None``.
+
+        Resolves the ``@BackPage`` attribute (which carries the target's
+        ``@NameU``) to the live :class:`Page` instance in the parent
+        :class:`Pages` collection. Returns ``None`` if the attribute is
+        absent or points at a missing / non-background page.
+
+        .. versionadded:: 0.2.0
+        """
+        name = self._element.get("BackPage")
+        if not name:
+            return None
+        for page in self._parent:
+            if page._element.get("NameU") == name and page.is_background:
+                return page
+        return None
+
+    @background_page.setter
+    def background_page(self, value: Optional["Page"]) -> None:
+        """Assign a background page to this page.
+
+        Passes ``None`` to clear the reference. The target must be a
+        background page (``is_background=True``) and must not be this
+        page itself (self-reference is refused).
+
+        :raises ValueError: when the target is not a background page,
+            or when assigning a page as its own background.
+        """
+        if value is None:
+            self._element.attrib.pop("BackPage", None)
+            return
+        if value is self:
+            raise ValueError(
+                "cannot assign a page as its own background"
+            )
+        if not value.is_background:
+            raise ValueError(
+                "target page %r is not a background page "
+                "(set is_background=True first)" % value.name
+            )
+        target_name = value._element.get("NameU") or value.name
+        if not target_name:
+            raise ValueError(
+                "background page has no NameU; assign a name first"
+            )
+        self._element.set("BackPage", target_name)
+
     # -- navigation -----------------------------------------------------
 
     @property
@@ -121,6 +212,82 @@ class Pages(ParentedElementProxy):
         page = Page(page_part, self)
         self._page_cache.append(page)
         return page
+
+    def add_background_page(
+        self,
+        name: Optional[str] = None,
+        width: float = 8.5,
+        height: float = 11.0,
+    ) -> Page:
+        """Add a new background page and return its :class:`Page` proxy.
+
+        The page is created with ``@Background="1"`` — use
+        :attr:`Page.background_page` on a foreground page to wire the
+        reference. See 0.2.0 scoping doc §5.4.
+
+        .. versionadded:: 0.2.0
+        """
+        # Default the name to a non-conflicting background-page name.
+        if name is None:
+            base = "VBackground"
+            existing = {p._element.get("NameU") for p in self._page_cache}
+            idx = 1
+            while f"{base}-{idx}" in existing:
+                idx += 1
+            name = f"{base}-{idx}"
+        page = self.add_page(name=name, width=width, height=height)
+        page.is_background = True
+        return page
+
+    # -- filter views ---------------------------------------------------
+
+    @property
+    def foreground(self) -> "list[Page]":
+        """All non-background pages, in source order.
+
+        .. versionadded:: 0.2.0
+        """
+        return [p for p in self._page_cache if not p.is_background]
+
+    @property
+    def backgrounds(self) -> "list[Page]":
+        """All background pages, in source order.
+
+        .. versionadded:: 0.2.0
+        """
+        return [p for p in self._page_cache if p.is_background]
+
+    # -- dangling-reference cleanup -------------------------------------
+
+    def remove(self, page: Page) -> None:
+        """Remove *page* from the document, clearing dangling references.
+
+        Matches the scoping-doc open-question #2 recommendation (b) —
+        when a background page is removed, every foreground page that
+        referenced it has its ``@BackPage`` attribute cleared. No
+        exception is raised on dangling-cleanup.
+
+        .. versionadded:: 0.2.0
+        """
+        if page not in self._page_cache:
+            raise ValueError("page is not in this collection")
+        name_u = page._element.get("NameU")
+        # Clear dangling BackPage references on every surviving page.
+        if page.is_background and name_u:
+            for other in self._page_cache:
+                if other is page:
+                    continue
+                if other._element.get("BackPage") == name_u:
+                    other._element.attrib.pop("BackPage", None)
+        # Detach the <Page> index entry from pages.xml.
+        idx_el = page._element
+        parent_el = idx_el.getparent()
+        if parent_el is not None:
+            parent_el.remove(idx_el)
+        # Drop the cache entry. (Full package-rels cleanup for the part
+        # is a follow-up; the 0.2.0 semantic focus is on dangling
+        # name-references rather than part-level rel pruning.)
+        self._page_cache.remove(page)
 
     # -- internal -------------------------------------------------------
 

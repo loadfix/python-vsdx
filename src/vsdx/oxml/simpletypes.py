@@ -44,6 +44,7 @@ __all__ = [
     "ST_BaseID",
     "ST_Boolean",
     "ST_FormulaString",
+    "ST_LayerMember",
     "ST_LineStyle",
     "ST_PageIndex",
     "ST_RouteStyle",
@@ -365,6 +366,44 @@ class ST_BaseID(BaseStringType):
         if not _GUID_RE.match(value):
             raise ValueError(
                 "BaseID must be a curly-braced GUID, got %r" % value
+            )
+
+
+class ST_LayerMember(BaseStringType):
+    """``Cell[@N='LayerMember']/@V`` — comma-separated non-negative ints.
+
+    Gives the zero-based indices of the ``<Layer>`` rows (in the owning
+    page's ``<Section N="Layer">``) that a shape belongs to. Real Visio
+    output emits ``"0"``, ``"0,2"``, ``"0,2,5"`` etc. — strictly
+    non-negative integers joined by a literal comma, no whitespace.
+
+    We never normalise (sort / dedup) on read-modify-write: the
+    round-trip invariant is byte-identical preservation of the source
+    ordering (§2.5 of the 0.2.0 scoping doc).
+
+    .. versionadded:: 0.2.0
+    """
+
+    _LAYER_MEMBER_RE = re.compile(r"^\d+(,\d+)*$")
+    _MAX_LEN = 4 * 1024  # 4 KiB cap — a shape on 1000 layers is already absurd
+
+    @classmethod
+    def validate(cls, value) -> None:  # type: ignore[override]
+        cls.validate_string(value)
+        if value == "":
+            # empty-string LayerMember means "not on any layer"; Visio
+            # desktop treats this identically to an absent cell. Accept
+            # it so proxy-layer delete() can clear membership without a
+            # special-case removal.
+            return
+        if len(value) > cls._MAX_LEN:
+            raise ValueError(
+                "LayerMember exceeds %d-byte cap" % cls._MAX_LEN
+            )
+        if not cls._LAYER_MEMBER_RE.match(value):
+            raise ValueError(
+                "LayerMember must be comma-separated non-negative ints, "
+                "got %r" % value
             )
 
 
