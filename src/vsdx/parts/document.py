@@ -18,10 +18,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ooxml_opc import XmlPart, parse_xml
+from ooxml_opc import XmlPart
 from ooxml_opc.packuri import PackURI
 
 from vsdx.constants import CT_VSDX_DRAWING_MAIN
+from vsdx.oxml import parse_xml
 from vsdx.parts._templates import DEFAULT_DOCUMENT_XML
 
 if TYPE_CHECKING:
