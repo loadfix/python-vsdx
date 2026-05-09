@@ -20,18 +20,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from ooxml_opc import XmlPart
 from ooxml_opc.packuri import PackURI
 
 from vsdx.constants import CT_VSDX_PAGE, CT_VSDX_PAGES, NS_R, RT_VISIO_PAGE
 from vsdx.oxml import parse_xml, qn
 from vsdx.parts._templates import DEFAULT_PAGE_XML, DEFAULT_PAGES_XML
+from vsdx.parts._verbatim import VerbatimXmlPart
 
 if TYPE_CHECKING:
     from ooxml_opc import OpcPackage
 
 
-class PagesPart(XmlPart):
+class PagesPart(VerbatimXmlPart):
     """The ``/visio/pages/pages.xml`` index part.
 
     Singleton within a package. Content-type
@@ -123,7 +123,7 @@ class PagesPart(XmlPart):
         return page_part
 
 
-class PagePart(XmlPart):
+class PagePart(VerbatimXmlPart):
     """A ``/visio/pages/page%d.xml`` per-page part.
 
     Content-type ``application/vnd.ms-visio.page+xml``. Partname is

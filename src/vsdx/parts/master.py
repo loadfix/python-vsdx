@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ooxml_opc import XmlPart
 from ooxml_opc.packuri import PackURI
 
 from vsdx.constants import (
@@ -30,12 +29,13 @@ from vsdx.constants import (
 )
 from vsdx.oxml import parse_xml, qn
 from vsdx.parts._templates import DEFAULT_MASTER_XML, DEFAULT_MASTERS_XML
+from vsdx.parts._verbatim import VerbatimXmlPart
 
 if TYPE_CHECKING:
     from ooxml_opc import OpcPackage
 
 
-class MastersPart(XmlPart):
+class MastersPart(VerbatimXmlPart):
     """The ``/visio/masters/masters.xml`` index part.
 
     Singleton within a package. Content-type
@@ -116,7 +116,7 @@ class MastersPart(XmlPart):
         return master_part
 
 
-class MasterPart(XmlPart):
+class MasterPart(VerbatimXmlPart):
     """A ``/visio/masters/master%d.xml`` per-master part.
 
     Content-type ``application/vnd.ms-visio.master+xml``.

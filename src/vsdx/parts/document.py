@@ -19,19 +19,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
 from ooxml_opc import RELATIONSHIP_TYPE as RT
-from ooxml_opc import XmlPart
 from ooxml_opc.packuri import PackURI
 
 from vsdx.constants import CT_VSDX_DRAWING_MAIN
 from vsdx.oxml import parse_xml
 from vsdx.parts._templates import DEFAULT_DOCUMENT_XML
+from vsdx.parts._verbatim import VerbatimXmlPart
 from vsdx.parts.theme import ThemePart
 
 if TYPE_CHECKING:
     from ooxml_opc import OpcPackage
 
 
-class VisioDocumentPart(XmlPart):
+class VisioDocumentPart(VerbatimXmlPart):
     """The ``/visio/document.xml`` part.
 
     Content-type ``application/vnd.ms-visio.drawing.main+xml``.

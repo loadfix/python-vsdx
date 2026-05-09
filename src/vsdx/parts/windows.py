@@ -18,18 +18,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ooxml_opc import XmlPart
 from ooxml_opc.packuri import PackURI
 
 from vsdx.constants import CT_VSDX_WINDOWS
 from vsdx.oxml import parse_xml
 from vsdx.parts._templates import DEFAULT_WINDOWS_XML
+from vsdx.parts._verbatim import VerbatimXmlPart
 
 if TYPE_CHECKING:
     from ooxml_opc import OpcPackage
 
 
-class WindowsPart(XmlPart):
+class WindowsPart(VerbatimXmlPart):
     """The ``/visio/windows.xml`` part.
 
     Singleton within a package. Content-type
