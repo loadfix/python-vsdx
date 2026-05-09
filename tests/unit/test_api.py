@@ -36,6 +36,41 @@ class DescribeVisio:
         doc = Visio()
         assert len(doc.masters) == 0
 
+    def it_exposes_theme_none_on_a_bare_package(self):
+        # -- VisioPackage.new() deliberately does not seed a theme part;
+        # -- that responsibility lives in track 4 (templates). The
+        # -- adoption task surfaces None in the interim rather than
+        # -- inventing a synthetic theme.
+        doc = Visio()
+
+        assert doc.theme is None
+
+    def it_exposes_the_theme_proxy_when_a_theme_part_is_related(self):
+        from ooxml_opc import RELATIONSHIP_TYPE as RT
+
+        from vsdx import Theme
+        from vsdx.parts.theme import ThemePart
+
+        _STUB = (
+            b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            b'<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+            b' name="Office Theme">'
+            b"<a:themeElements>"
+            b'<a:clrScheme name="Office">'
+            b'<a:accent1><a:srgbClr val="4F81BD"/></a:accent1>'
+            b"</a:clrScheme>"
+            b"</a:themeElements></a:theme>"
+        )
+        doc = Visio()
+        theme_part = ThemePart.new(doc.package, _STUB)
+        doc.package.document_part.relate_to(theme_part, RT.THEME)
+
+        theme = doc.theme
+
+        assert isinstance(theme, Theme)
+        assert theme.name == "Office Theme"
+        assert theme.color("accent1") == "4F81BD"
+
     def it_can_author_a_connected_diagram(self):
         """End-to-end happy path from the brief — 4-shape connected diagram."""
         doc = Visio()

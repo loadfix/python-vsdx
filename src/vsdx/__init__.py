@@ -40,6 +40,7 @@ from vsdx.master import Master, Masters
 from vsdx.page import Page, Pages
 from vsdx.shapes import Connector, Ellipse, Rectangle, Shape, ShapeTree, Triangle
 from vsdx.text import Paragraph, Run, TextFrame
+from vsdx.theme import Theme
 from vsdx.util import Cm, Emu, Inches, Length, Mm, Pt
 
 __version__ = "0.1.0.dev0"
@@ -77,6 +78,7 @@ __all__ = [
     "Shape",
     "ShapeTree",
     "TextFrame",
+    "Theme",
     "Triangle",
     "VS_CONNECTOR_STYLE",
     "VS_SHAPE_TYPE",

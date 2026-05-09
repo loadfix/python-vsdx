@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [
     "lxml>=4.9.1",
     "python-ooxml-opc @ git+https://github.com/loadfix/python-ooxml-opc@master",
+    "python-ooxml-shared-drawingml @ git+https://github.com/loadfix/python-ooxml-shared-drawingml@master",
     "python-ooxml-xmlchemy @ git+https://github.com/loadfix/python-ooxml-xmlchemy@master",
     "typing-extensions>=4.9.0",
 ]

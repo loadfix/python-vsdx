@@ -16,14 +16,16 @@ the theme part (via the shared ``RT.THEME``).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
+from ooxml_opc import RELATIONSHIP_TYPE as RT
 from ooxml_opc import XmlPart
 from ooxml_opc.packuri import PackURI
 
 from vsdx.constants import CT_VSDX_DRAWING_MAIN
 from vsdx.oxml import parse_xml
 from vsdx.parts._templates import DEFAULT_DOCUMENT_XML
+from vsdx.parts.theme import ThemePart
 
 if TYPE_CHECKING:
     from ooxml_opc import OpcPackage
@@ -55,3 +57,23 @@ class VisioDocumentPart(XmlPart):
             package,
             element,
         )
+
+    @property
+    def theme_part(self) -> Optional[ThemePart]:
+        """The :class:`~vsdx.parts.theme.ThemePart` related to this
+        document, or ``None`` if the package has no theme.
+
+        Visio packages produced by Microsoft Visio always carry a
+        theme, but :meth:`~vsdx.package.VisioPackage.new` constructs a
+        bare package without one (seed-template injection is a track-4
+        responsibility); ``None`` is the honest result in that case.
+
+        .. versionadded:: 0.1.0
+        """
+        for rel in self.rels.values():
+            if rel.is_external or rel.reltype != RT.THEME:
+                continue
+            target = rel.target_part
+            if isinstance(target, ThemePart):
+                return target
+        return None

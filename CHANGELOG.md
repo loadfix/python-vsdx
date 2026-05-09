@@ -6,6 +6,28 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — shared-drawingml theme adoption
+
+- **`vsdx.theme.Theme`** — high-level proxy over the
+  `/visio/theme/theme1.xml` DrawingML theme part. Surfaces the theme
+  `name`, `color_scheme_name`, and `font_scheme_name` attributes plus
+  query / mutate helpers for the twelve colour-scheme slots
+  (`dk1`–`lt2`, `accent1`–`accent6`, `hlink`, `folHlink`) and
+  `major`/`minor` Latin typefaces.
+- **`vsdx.document.VisioDocument.theme`** — returns the `Theme` proxy
+  when the package carries a theme part, else `None`.
+- **`vsdx.parts.theme.ThemePart`** — typed facade around the byte
+  blob: `theme_element`, `name`, `color_scheme()`, `font_scheme()`
+  helpers backed by `python-ooxml-shared-drawingml`'s hardened
+  parser. Unmodified reads still round-trip byte-identically; the
+  part re-serialises through lxml only after a mutation.
+- **Runtime dep** — added
+  `python-ooxml-shared-drawingml @ git+.../master` to
+  `pyproject.toml`. Theme `CT_OfficeStyleSheet` / `CT_ColorScheme`
+  / `CT_FontScheme` `CT_*` classes are not yet exported by the
+  shared package; a follow-up track will switch `ThemePart` to
+  `XmlPart` once they land.
+
 ### Added — oxml element-class layer (track 1 of the 0.1.0 fan-out)
 
 - **`vsdx.constants`** — namespace URIs (`NS_VSDX_CORE`, `NS_R`),
