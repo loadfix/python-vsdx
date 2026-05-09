@@ -55,6 +55,7 @@ from vsdx.constants import (
 from vsdx.document import VisioDocument
 from vsdx.enum.shapes import VS_CONNECTOR_STYLE, VS_SHAPE_TYPE
 from vsdx.hyperlinks import Hyperlink, HyperlinkCollection
+from vsdx.ink import InkStroke
 from vsdx.geometry import (
     ArcTo,
     EllipticalArcTo,
@@ -145,6 +146,7 @@ __all__ = [
     "HyperlinkCollection",
     "InfiniteLine",
     "Inches",
+    "InkStroke",
     "Layer",
     "Layers",
     "Length",

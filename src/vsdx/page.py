@@ -22,6 +22,7 @@ from vsdx.util import Inches, Length, lazyproperty
 
 if TYPE_CHECKING:
     from vsdx.document import VisioDocument
+    from vsdx.ink import InkStroke
     from vsdx.layers import Layers
     from vsdx.oxml._stubs import CT_Cell, CT_Page, CT_PageSheet  # TODO(vsdx/track-1)
     from vsdx.parts._stubs import PagePart, PagesPart  # TODO(vsdx/track-2)
@@ -455,6 +456,131 @@ class Page(PartElementProxy):
                 "Page.theme setter expects a Theme or None, got %r" % type(value).__name__
             )
         self._page_part.relate_to(value.part, RT.THEME)
+
+    # -- ink annotations ------------------------------------------------
+
+    @property
+    def ink_strokes(self) -> "list[InkStroke]":
+        """Flat list of |InkStroke| for every ``<inkml:trace>`` on this page.
+
+        Walks the page part's relationships for every
+        :data:`ooxml_ink.RELATIONSHIP_TYPE_INK` edge, resolves each to
+        its :class:`~vsdx.parts.ink.InkPart`, and enumerates the part's
+        traces in document order. Traces are flattened across parts —
+        the returned list does not expose which part a stroke
+        originated in.
+
+        Returns ``[]`` when the page has no ink parts or when every
+        resolvable part has zero traces. Degrades to ``[]`` if the
+        shared ``ooxml_ink`` package is not importable.
+
+        .. versionadded:: 0.3.0
+        """
+        try:
+            from ooxml_ink import RELATIONSHIP_TYPE_INK
+            from ooxml_ink.oxml.inkml import CT_Ink
+            from ooxml_ink.part import InkPart as _SharedInkPart
+
+            from vsdx.ink import InkStroke
+        except ImportError:
+            return []
+
+        strokes: list[InkStroke] = []
+        for rel in self._page_part.rels.values():
+            if rel.is_external or rel.reltype != RELATIONSHIP_TYPE_INK:
+                continue
+            ink_part = rel.target_part
+            if not isinstance(ink_part, _SharedInkPart):
+                continue
+            try:
+                ink_elm = ink_part.ink
+            except Exception:  # noqa: BLE001  -- malformed ink survivable
+                continue
+            if not isinstance(ink_elm, CT_Ink):
+                continue
+            for trace in ink_elm.all_traces:
+                strokes.append(InkStroke(trace, ink_elm))
+        return strokes
+
+    def add_ink_stroke(
+        self,
+        points: "list[tuple[float, float]] | list[tuple[float, float, float]]",
+        pressure: "list[float] | None" = None,
+        color: "str | None" = None,
+        width: "float | None" = None,
+    ) -> "InkStroke":
+        """Append a new ink stroke to this page and return its |InkStroke| proxy.
+
+        *points* is a non-empty list of ``(x, y)`` pairs — or 3-tuples
+        ``(x, y, pressure)`` if you prefer to carry per-point pressure
+        alongside the coordinates; in that case leave the *pressure*
+        kwarg at its default.
+
+        *pressure* is an optional per-point pressure list; supplying
+        this instead of 3-tuples yields the same result with a cleaner
+        coordinate list.
+
+        *color* is a hex-RGB string (``"#RRGGBB"`` or ``"RRGGBB"``) and
+        *width* is a nib width in pixels; either may be omitted.
+
+        Creates — or reuses — a single ``/visio/ink/ink{n}.xml`` part
+        for this page and establishes an
+        :data:`~ooxml_ink.RELATIONSHIP_TYPE_INK` relationship on the
+        page part. Subsequent calls to :meth:`add_ink_stroke` reuse the
+        existing ink part so strokes authored in one session share a
+        single InkML file — matching how Office groups strokes drawn
+        during a single "pen-down to pen-up" sequence.
+
+        Raises :class:`ValueError` when *points* is empty or when
+        *pressure* is supplied with a mismatched length. Raises
+        :class:`ImportError` when ``ooxml_ink`` is not installed.
+
+        .. versionadded:: 0.3.0
+        """
+        if not points:
+            raise ValueError("ink stroke must carry at least one point")
+
+        from ooxml_ink import CONTENT_TYPE_INK, RELATIONSHIP_TYPE_INK
+
+        from vsdx.ink import InkStroke
+        from vsdx.parts.ink import InkPart as _VsdxInkPart
+        from vsdx.parts.ink import append_trace
+
+        # -- normalise 3-tuple (x, y, pressure) shorthand into an explicit
+        # -- pressure list. Tolerates mixed shapes as long as consistent.
+        if pressure is None and points and len(points[0]) >= 3:
+            pressure = [float(p[2]) for p in points]
+            points = [(float(p[0]), float(p[1])) for p in points]
+
+        # -- locate the page's existing authored ink part; otherwise mint a
+        # -- fresh one and wire it into the page-part rels. Only
+        # -- :class:`vsdx.parts.ink.InkPart` is eligible for reuse — a bare
+        # -- shared ``ooxml_ink.InkPart`` loaded from disk is treated
+        # -- verbatim.
+        ink_part: "_VsdxInkPart | None" = None
+        for rel in self._page_part.rels.values():
+            if rel.is_external or rel.reltype != RELATIONSHIP_TYPE_INK:
+                continue
+            candidate = rel.target_part
+            if (
+                isinstance(candidate, _VsdxInkPart)
+                and candidate.content_type == CONTENT_TYPE_INK
+            ):
+                ink_part = candidate
+                break
+
+        if ink_part is None:
+            ink_part = _VsdxInkPart.new(self._page_part.package)
+            self._page_part.relate_to(ink_part, RELATIONSHIP_TYPE_INK)
+
+        trace = append_trace(
+            ink_part,
+            [(float(p[0]), float(p[1])) for p in points],
+            pressure=pressure,
+            color=color,
+            width=width,
+        )
+        return InkStroke(trace, ink_part.ink)
 
     # -- navigation -----------------------------------------------------
 
