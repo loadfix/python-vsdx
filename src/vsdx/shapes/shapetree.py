@@ -18,6 +18,7 @@ from vsdx.shapes.autoshape import (
 )
 from vsdx.shapes.base import Shape, TextShape
 from vsdx.shapes.connector import Connector
+from vsdx.shapes.group import GroupShape, group_shapes as _group_shapes_impl
 from vsdx.shared import ParentedElementProxy
 
 if TYPE_CHECKING:
@@ -150,10 +151,32 @@ class ShapeTree(ParentedElementProxy):
         )
         return conn
 
+    def group(self, shapes: "list[Shape]") -> GroupShape:
+        """Aggregate *shapes* into a new :class:`GroupShape`.
+
+        The returned group carries a page-scoped PinX / PinY that is
+        the centre of the bounding box of *shapes*; each member's
+        PinX / PinY is rewritten to group-local coordinates so a
+        Visio-desktop re-open sees the members at their original
+        positions.
+
+        Every shape in *shapes* must currently belong to this tree
+        (it is not validated that membership — a future 0.2.x may
+        add the guard).
+
+        .. versionadded:: 0.2.0
+        """
+        return _group_shapes_impl(self, shapes)
+
     # -- helpers --------------------------------------------------------
 
     def _proxy_for(self, shape_el: "CT_Shape") -> Shape:
         """Return the best-fit :class:`Shape` proxy subclass for *shape_el*."""
+        # Group shapes are detected by ``@Type="Group"`` — they may or
+        # may not carry a ``@Master`` attribute (user-authored groups
+        # typically don't; master-instance groups do).
+        if shape_el.get("Type") == VS_SHAPE_TYPE.GROUP.value:
+            return GroupShape(shape_el, self)
         name_u = shape_el.get("Master") or ""
         if name_u == VS_SHAPE_TYPE.DYNAMIC_CONNECTOR.value:
             return Connector(shape_el, self)

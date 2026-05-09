@@ -201,6 +201,68 @@ class Shape(ParentedElementProxy):
         self.width = width
         self.height = height
 
+    # -- group / layers -------------------------------------------------
+
+    def ungroup(self):
+        """Ungroup a :class:`~vsdx.shapes.group.GroupShape`.
+
+        Raises :class:`TypeError` on a non-group shape.  Present on the
+        base class to give every shape a uniform call-site; actual
+        behaviour is polymorphic via :class:`GroupShape.ungroup`.
+
+        .. versionadded:: 0.2.0
+        """
+        raise TypeError(
+            "ungroup() only supported on GroupShape (got %s)"
+            % type(self).__name__
+        )
+
+    @property
+    def layers(self) -> "list":
+        """The :class:`~vsdx.layers.Layer` proxies this shape belongs to.
+
+        Reads the shape's ``<Cell N="LayerMember" V="…">`` and resolves
+        each index against the owning page's layer section. Returns an
+        empty list when the shape has no ``LayerMember`` cell.
+
+        .. versionadded:: 0.2.0
+        """
+        from vsdx.layers import _shape_layers_proxy
+        from vsdx.page import Page
+        from vsdx.shapes.shapetree import ShapeTree
+
+        # Walk up to the owning Page proxy. ShapeTree._parent is Page.
+        parent = self._parent
+        if isinstance(parent, ShapeTree):
+            page = parent._parent
+        elif isinstance(parent, Page):
+            page = parent
+        else:
+            # Shapes inside a GroupShape use the group as parent; climb.
+            climbing = parent
+            while climbing is not None and not isinstance(climbing, Page):
+                climbing = getattr(climbing, "_parent", None)
+            page = climbing
+        if page is None:
+            return []
+        return _shape_layers_proxy(self, page)
+
+    def set_layers(self, layers) -> None:
+        """Replace this shape's layer membership with *layers*.
+
+        :param layers: iterable of :class:`~vsdx.layers.Layer` proxies.
+
+        Writes a fresh ``<Cell N="LayerMember" V="0,2,5">`` on the
+        shape (the scoping-doc round-trip invariant #3 requires
+        ordering be callable-supplied; we serialise verbatim).
+
+        .. versionadded:: 0.2.0
+        """
+        from vsdx.layers import _set_shape_layer_indices
+
+        indices = [layer.index for layer in layers]
+        _set_shape_layer_indices(self._element, indices)
+
     # -- helpers --------------------------------------------------------
 
     def _get_cell(self, name: str) -> Optional["CT_Cell"]:
