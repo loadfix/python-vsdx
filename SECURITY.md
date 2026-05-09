@@ -7,6 +7,7 @@ If you're on an older version, the fix is "upgrade".
 
 | Version | Supported          |
 |---------|--------------------|
+| 0.2.x   | yes                |
 | 0.1.x   | yes                |
 | < 0.1   | no — upgrade       |
 
@@ -58,6 +59,25 @@ XML parser itself and the per-part size before the parser runs:
   as integers and does no cross-shape dereferencing — the proxy
   layer (out of 0.1.0 track-1 scope) is responsible for defensive
   lookup.
+- **VBA project (`.vsdm` / `.vssm` / `.vstm`).** `python-vsdx` loads
+  the `vbaProject.bin` part as an **opaque byte blob**. The bytes
+  are never parsed, never executed, never decompiled. Size capped at
+  16 MiB on read (see `vsdx.parts.vba.VBA_PROJECT_SIZE_CAP`). Users
+  who care about macro safety must scan the blob externally (MSRT,
+  oletools, Defender).
+  - **VBA authoring is never in scope** for any release. Writing
+    ShapeSheet / cell values + adding new shapes is well-defined;
+    writing attacker-controlled VBA is not, and `python-vsdx`
+    intentionally does not expose that surface.
+  - Converting `.vsdm` → `.vsdx` on save-as strips the
+    `vbaProject.bin` part and updates `[Content_Types].xml`. This
+    is not a security feature (the underlying bytes were never
+    scanned) — it is a file-format conformance guarantee.
+- **Stencil + template size caps.** `.vssx` / `.vstx` and their macro
+  twins can legitimately contain a large master catalogue; the
+  scoping-doc §9.4 per-master / per-stencil caps (1,000 shapes per
+  master, 1,000 masters per file) land in 0.2.x alongside the Tier-4
+  stencil fixture.
 
 Out of scope:
 

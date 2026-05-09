@@ -6,6 +6,138 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-09
+
+Implements `audits/2026-05-09-vsdx-0.2-scoping.md`. Seven scoping-doc
+deliverables — layers, user-authored groups, background pages, the
+stencil / template variants, and opaque round-trip of macro-enabled
+variants. Custom geometry and the ShapeSheet formula evaluator remain
+deferred to 0.3.0.
+
+### Added — layers (scoping §4.1)
+
+- **`vsdx.layers.Layer`** and **`vsdx.layers.Layers`** — proxies over
+  the `<Section N="Layer">` on a page's `<PageSheet>`. Each `Layer`
+  exposes `name` / `name_univ` / `visible` / `print` / `locked` /
+  `active` / `snap` / `glue` / `color` accessors and an `index`
+  property reflecting the row's `@IX`.
+- **`Page.layers`** — :class:`Layers` collection on every page.
+- **`Layers.add(name, *, visible=True, print=True, color="Themed")`** —
+  monotonic `@IX` assignment; defaults match Visio desktop's new-layer
+  dialog.
+- **`Layers.remove(layer)`** — renumbers surviving layers and rewrites
+  every shape's `LayerMember` cell to drop-and-decrement (matches
+  Visio desktop; see scoping-doc open-question #3).
+- **`Layers.get(name)`** / **`Layers.shapes_on(layer)`** — lookup and
+  reverse-membership helpers.
+- **`Shape.layers`** / **`Shape.set_layers(layers)`** — shape-scoped
+  membership via the `<Cell N="LayerMember" V="0,2">` cell. Round-trip
+  preserves caller-supplied ordering verbatim (scoping §2.5 #3).
+- **`vsdx.oxml.simpletypes.ST_LayerMember`** — new simple type. Regex
+  `^\d+(,\d+)*$`, 4 KiB cap, empty-string accepted.
+
+### Added — user-authored groups (scoping §4.2)
+
+- **`vsdx.shapes.group.GroupShape`** — `TextShape` subclass dispatched
+  for `<Shape Type="Group">`. Carries `member_shapes` (a live list
+  of proxy-dispatched children) plus `__iter__` / `__len__`.
+- **`ShapeTree.group(shapes)`** — aggregates shapes into a new
+  `GroupShape`. Computes bounding box, allocates a fresh page-scoped
+  `@ID`, sets the group's PinX / PinY / Width / Height, reparents
+  each member under the nested `<Shapes>`, and rewrites member
+  PinX / PinY to group-local coordinates.
+- **`GroupShape.ungroup()`** — inverse operation; hoists members back
+  to page coordinates and removes the wrapper element.
+- **`ShapeTree._proxy_for`** extended to dispatch on `@Type="Group"`
+  regardless of `@Master`.
+
+### Added — background pages (scoping §5)
+
+- **`Page.is_background`** (bool) — read/write property mapping
+  `<Page @Background="1">`.
+- **`Page.background_page`** (Page | None) — resolves / writes the
+  `<Page @BackPage="NameU">` reference by target `@NameU` string, not
+  rel-id (per dave-howard/vsdx 0.6.1 confirmation). Setter refuses
+  self-reference and non-background targets.
+- **`Pages.add_background_page(name=None, ...)`** — convenience
+  factory; auto-names `VBackground-N` when `name` is omitted.
+- **`Pages.foreground`** / **`Pages.backgrounds`** — filter views over
+  the page collection.
+- **`Pages.remove(page)`** — removes a page and auto-clears dangling
+  `@BackPage` references on foreground siblings (scoping-doc
+  open-question #2 recommendation (b)).
+- **`vsdx.oxml.page.CT_Page`** — `@Background` and `@BackPage` retyped
+  to `XsdString` (0.1.0 speculated `XsdUnsignedInt` for `@BackPage`,
+  which was wrong). New `@Background` attribute descriptor.
+
+### Added — content-type variants + macro passthrough (scoping §3, §6)
+
+- **`vsdx.Stencil(source=None)`** — factory returning a `VisioDocument`
+  wrapped around a stencil package. Discriminates on root CT; raises
+  `ValueError` when opened against a non-stencil.
+- **`vsdx.Template(source=None)`** — factory returning a `VisioDocument`
+  wrapped around a template package. Template and drawing share the
+  same XML vocabulary; only the root CT differs.
+- **`vsdx.VisioPackageOpener.open(source)`** — content-type-aware
+  opener that delegates to `VisioPackage.open` and returns a
+  `VisioDocument` regardless of package kind.
+- **`VisioPackage.new(kind="drawing"|"stencil"|"template")`** —
+  extended factory. Stencil builds substitute `StencilPart` at the
+  root and omit the `PagesPart`.
+- **`VisioPackage.kind`** property + **`VisioPackage.is_macro_enabled`** /
+  **`VisioPackage.vba_project_part`** helpers.
+- **`VisioDocumentPart.new_template`** — template-variant constructor
+  (same XML as `new`, different content-type override).
+- **`vsdx.parts.vba.VbaProjectPart`** — opaque binary passthrough for
+  `/visio/vbaProject.bin`. 16 MiB size cap enforced at construction.
+  Bytes never parsed or executed.
+- **`vsdx.constants`** — new `CT_VSDX_MACRO_STENCIL_MAIN`,
+  `CT_VSDX_MACRO_TEMPLATE_MAIN`, `CT_VBA_PROJECT`, `RT_VBA_PROJECT`,
+  `VSDX_KIND_DRAWING` / `VSDX_KIND_STENCIL` / `VSDX_KIND_TEMPLATE`.
+- **`VISIO_PART_TYPE_MAP`** extended with all four macro-enabled root
+  content-types plus `CT_VBA_PROJECT` for the shared OPC loader
+  dispatch.
+
+### Changed
+
+- `vsdx.__version__` → `"0.2.0.dev0"`.
+- `CT_Page.back_page` descriptor widened from `XsdUnsignedInt` to
+  `XsdString`.
+
+### Tests
+
+- **17 layer unit tests** (`tests/unit/test_layers.py`).
+- **13 group unit tests** (`tests/unit/test_group.py`).
+- **16 background-page unit tests** (`tests/unit/test_background_page.py`).
+- **18 kind-variant unit tests** (`tests/unit/test_kind_variants.py`).
+- **7 `ST_LayerMember` simple-type tests** added to
+  `tests/unit/test_simpletypes.py`.
+
+Total: 71 new unit tests; suite passes at 521 tests (up from 450 in
+0.1.0). Conformance harness (5 pre-existing environment failures
+unrelated to 0.2.0) unchanged; new fixtures per scoping-doc §8 land
+in a separate gating step.
+
+### Security — new 0.2.0 attack surface
+
+- `vbaProject.bin` blobs rejected above 16 MiB at read time. No VBA
+  parsing, no execution — bytes are an opaque passthrough. See
+  `SECURITY.md`.
+
+### Not yet in this release
+
+- **Tier-4 fixtures** — the nine `.office.vsd*` fixtures in §8 of the
+  scoping doc are gated on user production in Visio desktop.
+- **`.vsdm → .vsdx` macro-strip on save-as** — smoke tests cover the
+  per-part detection; the save-as code path becomes active once a
+  `.vsdm` fixture lands.
+- **Conformance harness for `.vssx` / `.vstx` / `.vsdm`** — blocked on
+  fixture production.
+- **Custom geometry** / **ShapeSheet formula evaluator** / **theme
+  selection** — 0.3.0.
+
+## [0.1.0]
+
 ### Added — shared-drawingml theme adoption
 
 - **`vsdx.theme.Theme`** — high-level proxy over the
