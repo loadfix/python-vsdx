@@ -1,11 +1,16 @@
 """Tests for :mod:`vsdx.templates` — the bundled assets loader.
 
-Actual assets (``default.vsdx``, ``fragments/*.xml``) don't land until
-the fixtures in ``/tmp/vsdx-fixture-requests.md`` are produced. These
-tests pin the *interface* so consumers can write against it today.
+``default.vsdx`` now lands in ``src/vsdx/templates/`` as a library
+asset. Master fragments (``fragments/*.xml``) don't land until the
+per-master source fixtures (``rectangle-master.office.vsdx`` etc.)
+are harvested into XML fragments at library-build time — tests here
+pin the contract for both the landed-asset and the pending-asset
+states.
 """
 
 from __future__ import annotations
+
+import zipfile
 
 import pytest
 
@@ -18,10 +23,17 @@ from vsdx.templates import (
 
 
 class DescribeDefaultTemplate:
-    def it_raises_template_not_available_until_fixture_lands(self):
-        with pytest.raises(TemplateNotAvailable) as excinfo:
-            default_template_path()
-        assert "/tmp/vsdx-fixture-requests.md" in str(excinfo.value)
+    def it_returns_a_path_to_the_bundled_default_vsdx(self):
+        path = default_template_path()
+        assert path.exists()
+        assert path.name == "default.vsdx"
+
+    def it_is_a_valid_zip_archive_with_visio_parts(self):
+        path = default_template_path()
+        with zipfile.ZipFile(path) as zf:
+            names = zf.namelist()
+        assert "[Content_Types].xml" in names
+        assert any(n.startswith("visio/") for n in names)
 
 
 class DescribeMasterFragments:
