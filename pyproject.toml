@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-vsdx"
+authors = [{name = "loadfix contributors", email = "noreply@loadfix.dev"}]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Office Suites",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Text Processing :: Markup :: XML",
+]
+dependencies = [
+    "lxml>=4.9.1",
+    "python-ooxml-opc @ git+https://github.com/loadfix/python-ooxml-opc@master",
+    "python-ooxml-xmlchemy @ git+https://github.com/loadfix/python-ooxml-xmlchemy@master",
+    "typing-extensions>=4.9.0",
+]
+description = "Microsoft Visio (.vsdx) authoring library for the loadfix OOXML family."
+dynamic = ["version"]
+keywords = ["ooxml", "visio", "vsdx", "diagram", "shapes"]
+license = "Apache-2.0"
+readme = "README.md"
+requires-python = ">=3.9"
+
+[project.urls]
+Homepage = "https://github.com/loadfix/python-vsdx"
+Issues = "https://github.com/loadfix/python-vsdx/issues"
+Repository = "https://github.com/loadfix/python-vsdx.git"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.0",
+    "pytest-cov",
+    "pytest-xdist",
+    "ruff>=0.11.13",
+    "pyright>=1.1.401",
+]
+docs = [
+    "sphinx>=8.0.0",
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "vsdx.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+vsdx = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py *_test.py"
+python_classes = "Describe*"
+python_functions = "it_* its_* they_* and_* but_* test_*"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.9"
+typeCheckingMode = "strict"
+reportUnnecessaryCast = true
+reportUnnecessaryTypeIgnoreComment = true
+reportImportCycles = false
