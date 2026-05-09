@@ -18,6 +18,7 @@ type / namespace identifiers the packaging layer needs.
 from __future__ import annotations
 
 from vsdx.api import Stencil, Template, Visio, VisioPackageOpener
+from vsdx.data_graphics import DataGraphic, DataGraphicItem, DataGraphics
 from vsdx.constants import (
     CT_VSDX_DRAWING_MAIN,
     CT_VSDX_MACRO_DRAWING_MAIN,
@@ -106,6 +107,9 @@ __all__ = [
     "ArcTo",
     "Cm",
     "Connector",
+    "DataGraphic",
+    "DataGraphicItem",
+    "DataGraphics",
     "Ellipse",
     "EllipticalArcTo",
     "Emu",

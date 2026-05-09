@@ -211,3 +211,8 @@ class CT_VisioDocument(BaseOxmlElement):
     styleSheets = ZeroOrOne("vsdx:StyleSheets")
     documentSheet = ZeroOrOne("vsdx:DocumentSheet")
     eventList = ZeroOrOne("vsdx:EventList")
+    # ``<Section>`` children at document root — primarily ``N="DataGraphic"``
+    # (one section per data-graphic definition, per MS Learn's DataGraphic
+    # reference). Auto-generates a ``section_lst`` getter on this class.
+    # Added 0.2.0 dev — R8-2.
+    section = ZeroOrMore("vsdx:Section")
