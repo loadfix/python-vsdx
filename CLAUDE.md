@@ -163,6 +163,49 @@ Test naming follows the loadfix family convention: `Describe*`
 classes, `it_*` / `its_*` / `they_*` methods. No docstrings on
 test methods.
 
+### Running the conformance (round-trip) harness
+
+`tests/conformance/` hosts the byte-identical round-trip harness —
+the enforcement arm of constraint #1 in **Three conformance
+constraints** below. It iterates every `.office.vsdx` fixture
+under `~/code/ooxml-reference-corpus/fixtures/vsdx/` (plus the
+bundled `src/vsdx/templates/default.vsdx` once it lands), loads
+each via `VisioPackage.open`, re-serialises via `.save(BytesIO)`,
+and asserts that every zip entry is byte-identical to the
+original's.
+
+```bash
+# Run only the conformance harness
+pytest -m conformance tests/conformance/ -v
+
+# Run everything except the conformance harness (fast unit loop)
+pytest -m 'not conformance' tests/
+
+# Override the corpus lookup path
+VSDX_CORPUS_ROOT=/path/to/alt/corpus pytest -m conformance tests/conformance/
+
+# See the list of fixtures pytest discovered without running them
+pytest -m conformance --collect-only -q tests/conformance/
+```
+
+The harness **skips cleanly** when no fixtures are present (clean
+checkout, CI without the corpus mounted, `default.vsdx` not yet
+bundled) — landing or removing fixtures never causes a green run
+to go red for infrastructure reasons.
+
+Per-entry diff: when a part's bytes drift, the failure names the
+drifting zip entry and shows the first 200 chars of the original
+and saved XML side-by-side. Whole-file dumps are deliberately
+avoided — the investigator gets a scannable hint, not a megabyte
+of XML. See `tests/conformance/diff.py` for the format. The
+harness is **pure instrumentation**: when a fixture fails, fix the
+underlying writer bug in a separate commit; never relax the
+harness's byte-equality contract to mask a drop.
+
+Expected fixtures are listed in
+`audits/2026-05-09-vsdx-fixture-guide.md` (18 `.office.vsdx` /
+`.office.vssx` produced by Microsoft Visio desktop).
+
 ## Release discipline
 
 - CalVer-ish `0.MAJOR.MINOR` pre-1.0.
