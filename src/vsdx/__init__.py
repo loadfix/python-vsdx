@@ -71,6 +71,7 @@ from vsdx.geometry import (
 from vsdx.layers import Layer, Layers
 from vsdx.master import Master, Masters
 from vsdx.page import Page, Pages
+from vsdx.print_setup import PRINT_ORIENTATION, PrintSetup
 from vsdx.shape_data import (
     PROPERTY_TYPE_BOOLEAN,
     PROPERTY_TYPE_CURRENCY,
@@ -141,6 +142,7 @@ __all__ = [
     "NURBSTo",
     "NS_R",
     "NS_VSDX_CORE",
+    "PRINT_ORIENTATION",
     "PROPERTY_TYPE_BOOLEAN",
     "PROPERTY_TYPE_CURRENCY",
     "PROPERTY_TYPE_DATE",
@@ -153,6 +155,7 @@ __all__ = [
     "Pages",
     "Paragraph",
     "PolylineTo",
+    "PrintSetup",
     "Pt",
     "RelCubBezTo",
     "RelEllipticalArcTo",

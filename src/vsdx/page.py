@@ -22,8 +22,9 @@ from vsdx.util import Inches, Length, lazyproperty
 if TYPE_CHECKING:
     from vsdx.document import VisioDocument
     from vsdx.layers import Layers
-    from vsdx.oxml._stubs import CT_Page  # TODO(vsdx/track-1)
+    from vsdx.oxml._stubs import CT_Cell, CT_Page, CT_PageSheet  # TODO(vsdx/track-1)
     from vsdx.parts._stubs import PagePart, PagesPart  # TODO(vsdx/track-2)
+    from vsdx.print_setup import PrintSetup
 
 
 class Page(PartElementProxy):
@@ -67,6 +68,237 @@ class Page(PartElementProxy):
     @height.setter
     def height(self, value: float) -> None:
         self._element.set("PageHeight", _fmt(float(value)))
+
+    # -- page scale / drawing scale (PageSheet singleton cells) --------
+
+    def _sheet_cell_v(self, name: str) -> Optional[str]:
+        """Return the ``@V`` on ``<PageSheet><Cell N=name>``, or ``None``.
+
+        Shared helper for scale / snap / visibility singleton cells —
+        all of which live as direct ``<Cell>`` children on the page's
+        ``<PageSheet>``. Returns ``None`` when the sheet is absent or
+        carries no cell with that ``@N``.
+        """
+        sheet = self._element.pageSheet
+        if sheet is None:
+            return None
+        for cell in sheet.cell_lst:
+            if cell.get("N") == name:
+                return cell.get("V")
+        return None
+
+    def _set_sheet_cell_v(
+        self, name: str, value: Optional[str], unit: Optional[str] = None
+    ) -> None:
+        """Create-or-update ``<PageSheet><Cell N=name V=value [U=unit]>``.
+
+        Passing ``None`` clears the cell entirely so Visio falls back
+        to the schema default on next open (matches the byte-identity
+        expectation of callers authoring against otherwise-default
+        pages — the cell is materialised only when explicitly set).
+        """
+        if value is None:
+            sheet = self._element.pageSheet
+            if sheet is None:
+                return
+            for cell in list(sheet.cell_lst):
+                if cell.get("N") == name:
+                    sheet.remove(cell)
+                    return
+            return
+        sheet = self._element.get_or_add_pageSheet()
+        target = None
+        for cell in sheet.cell_lst:
+            if cell.get("N") == name:
+                target = cell
+                break
+        if target is None:
+            target = sheet._add_cell()
+            target.set("N", name)
+        target.set("V", value)
+        if unit is not None:
+            target.set("U", unit)
+
+    @property
+    def page_scale(self) -> Optional[float]:
+        """The page (real-world) scale (``<PageSheet><Cell N="PageScale">``).
+
+        Visio's two-cell drawing-scale model splits the user's "1 inch
+        = 10 feet" setting into :attr:`page_scale` (the drawing-unit
+        multiplier Visio uses for page-space coordinates) and
+        :attr:`drawing_scale` (the real-world-unit measure). The ratio
+        ``drawing_scale / page_scale`` yields the displayed scale.
+
+        Returns ``None`` when the cell is absent (Visio defaults the
+        ratio to 1:1 — "no drawing scale"). Assigning ``None`` removes
+        the cell; numeric assignment materialises the PageSheet on
+        demand.
+
+        .. versionadded:: 0.3.0
+        """
+        raw = self._sheet_cell_v("PageScale")
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except ValueError:
+            return None
+
+    @page_scale.setter
+    def page_scale(self, value: Optional[float]) -> None:
+        if value is None:
+            self._set_sheet_cell_v("PageScale", None)
+            return
+        self._set_sheet_cell_v("PageScale", _fmt(float(value)), unit="IN")
+
+    @property
+    def drawing_scale(self) -> Optional[float]:
+        """The drawing (real-world) scale value (``<Cell N="DrawingScale">``).
+
+        See :attr:`page_scale` for the split-cell drawing-scale model.
+        Returns ``None`` when the cell is absent.
+
+        .. versionadded:: 0.3.0
+        """
+        raw = self._sheet_cell_v("DrawingScale")
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except ValueError:
+            return None
+
+    @drawing_scale.setter
+    def drawing_scale(self, value: Optional[float]) -> None:
+        if value is None:
+            self._set_sheet_cell_v("DrawingScale", None)
+            return
+        self._set_sheet_cell_v("DrawingScale", _fmt(float(value)), unit="IN")
+
+    @property
+    def drawing_size_type(self) -> Optional[int]:
+        """Drawing-size-type code (``<Cell N="DrawingSizeType">``).
+
+        Visio's ``visDrawSizeStandard`` enum — ``0`` = same-as-printer,
+        ``1`` = fit-to-drawing-contents, ``2`` = standard-paper,
+        ``3`` = custom-size, ``4`` = custom-scaled, etc. Returns
+        ``None`` when the cell is absent.
+
+        .. versionadded:: 0.3.0
+        """
+        raw = self._sheet_cell_v("DrawingSizeType")
+        if raw is None:
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            try:
+                return int(float(raw))
+            except ValueError:
+                return None
+
+    @drawing_size_type.setter
+    def drawing_size_type(self, value: Optional[int]) -> None:
+        if value is None:
+            self._set_sheet_cell_v("DrawingSizeType", None)
+            return
+        self._set_sheet_cell_v("DrawingSizeType", str(int(value)))
+
+    @property
+    def drawing_scale_type(self) -> Optional[int]:
+        """Drawing-scale-type code (``<Cell N="DrawingScaleType">``).
+
+        Visio's ``visDrawScaleType`` enum — ``0`` = no-scale,
+        ``1`` = architectural, ``2`` = civil-engineering, ``3`` =
+        custom, ``4`` = metric, ``5`` = mechanical-engineering, ``6``
+        = generic (dimensionless). Returns ``None`` when the cell is
+        absent.
+
+        .. versionadded:: 0.3.0
+        """
+        raw = self._sheet_cell_v("DrawingScaleType")
+        if raw is None:
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            try:
+                return int(float(raw))
+            except ValueError:
+                return None
+
+    @drawing_scale_type.setter
+    def drawing_scale_type(self, value: Optional[int]) -> None:
+        if value is None:
+            self._set_sheet_cell_v("DrawingScaleType", None)
+            return
+        self._set_sheet_cell_v("DrawingScaleType", str(int(value)))
+
+    @property
+    def inhibit_snap(self) -> bool:
+        """Whether the page suppresses snap (``<Cell N="InhibitSnap">``).
+
+        ``True`` corresponds to ``@V="1"``. Absent cells read as
+        ``False``. The setter materialises the cell on first use.
+
+        .. versionadded:: 0.3.0
+        """
+        raw = self._sheet_cell_v("InhibitSnap")
+        if raw is None:
+            return False
+        return raw.strip().lower() in ("1", "true", "yes", "-1")
+
+    @inhibit_snap.setter
+    def inhibit_snap(self, value: bool) -> None:
+        self._set_sheet_cell_v("InhibitSnap", "1" if bool(value) else "0")
+
+    @property
+    def ui_visibility(self) -> Optional[int]:
+        """UI-visibility flag (``<Cell N="UIVisibility">``).
+
+        ``0`` = visible (default), ``1`` = hidden-in-UI (used for
+        auxiliary pages Visio keeps in the file but hides from the
+        page-tab strip). Returns ``None`` when the cell is absent.
+
+        .. versionadded:: 0.3.0
+        """
+        raw = self._sheet_cell_v("UIVisibility")
+        if raw is None:
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            try:
+                return int(float(raw))
+            except ValueError:
+                return None
+
+    @ui_visibility.setter
+    def ui_visibility(self, value: Optional[int]) -> None:
+        if value is None:
+            self._set_sheet_cell_v("UIVisibility", None)
+            return
+        self._set_sheet_cell_v("UIVisibility", str(int(value)))
+
+    # -- print setup ----------------------------------------------------
+
+    @lazyproperty
+    def print_setup(self) -> "PrintSetup":
+        """:class:`~vsdx.print_setup.PrintSetup` proxy for this page.
+
+        Exposes the page-scope print cells (orientation, paper size,
+        margins, centering, tile scale) as typed properties. The
+        proxy is always returned — it walks the underlying
+        ``<PageSheet>`` on every access, so missing cells read as
+        ``None`` and writes materialise cells on demand.
+
+        .. versionadded:: 0.3.0
+        """
+        # Local import dodges the page <-> print_setup cycle; the
+        # module imports :class:`Page` for type-checking only.
+        from vsdx.print_setup import PrintSetup
+
+        return PrintSetup(self)
 
     # -- shape tree -----------------------------------------------------
 

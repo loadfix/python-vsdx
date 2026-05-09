@@ -6,6 +6,55 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — page scale + print setup (R8-6, R8-7)
+
+- **`vsdx.page.Page.page_scale`** / **`Page.drawing_scale`** — float
+  accessors over the ``<PageSheet><Cell N="PageScale">`` and
+  ``<Cell N="DrawingScale">`` singletons. Writes emit ``U="IN"``;
+  `None` clears the cell so Visio falls back to the 1:1 default.
+- **`Page.drawing_size_type`** / **`Page.drawing_scale_type`** — int
+  accessors over ``DrawingSizeType`` / ``DrawingScaleType`` (Visio's
+  ``visDrawSize*`` / ``visDrawScaleType`` enum codes).
+- **`Page.inhibit_snap`** — bool accessor over ``<Cell N="InhibitSnap">``.
+  Tolerates ``TRUE`` / ``FALSE`` / ``1`` / ``0`` on read; emits
+  ``"1"`` / ``"0"`` on write.
+- **`Page.ui_visibility`** — int accessor over ``<Cell N="UIVisibility">``.
+- **`vsdx.print_setup.PrintSetup`** — page-scope print-configuration
+  proxy over the print-related singleton cells on the page's
+  ``<PageSheet>``. Accessed via **`Page.print_setup`** (lazy — the
+  proxy is always returned and walks the sheet on every read so
+  concurrent oxml-layer edits stay consistent). Accessors:
+  ``.orientation`` (:class:`PRINT_ORIENTATION`), ``.paper_size``
+  (int — Windows ``DEVMODE.dmPaperSize`` enum), ``.margin_top``
+  / ``.margin_bottom`` / ``.margin_left`` / ``.margin_right`` (float
+  inches, ``U="IN"`` on write), ``.centered_x`` / ``.centered_y``
+  (bool), and ``.tile_scale`` (float — writes both ``ScaleX`` and
+  ``ScaleY`` in lockstep with Visio UI).
+- **`vsdx.print_setup.PRINT_ORIENTATION`** — ``str``-enum mirroring
+  ``<Cell N="PrintPageOrientation">`` ``@V``: ``SAME_AS_PRINTER``
+  (``"0"``), ``PORTRAIT`` (``"1"``), ``LANDSCAPE`` (``"2"``).
+  ``.orientation =`` accepts the enum, raw string, or integer; unknown
+  codes raise ``ValueError`` on authoring and read as ``None`` on
+  parse (load-preserve-save invariant).
+- **Zero new `CT_*` classes** — reuses the existing `CT_PageSheet`
+  direct-child ``<Cell>`` slot with value-level dispatch on
+  ``cell.@N``. Matches the R4-12 geometry / R8-3 shape-data pattern.
+- **`vsdx.PrintSetup` / `vsdx.PRINT_ORIENTATION`** — public re-exports
+  on the top-level package namespace.
+
+### Tests — page scale + print setup
+
+- **46 unit tests** (`tests/unit/test_print_setup.py`): scale-accessor
+  defaults (absent-cell → ``None`` / ``False``), authoring (cell
+  materialisation with ``U="IN"`` on scale cells, integer / float
+  preservation, tolerant boolean tokens, non-numeric parse-fallback),
+  clear-by-``None`` semantics; ``PrintSetup`` proxy instantiation +
+  lazy caching, orientation setter accepting enum / string / int +
+  unknown-code rejection + ``None``-on-parse for unknown values,
+  paper_size / margin / centering / tile_scale round-trips (tile_scale
+  writes both ``ScaleX`` and ``ScaleY``), and an 18-cell fixture-shaped
+  parse → mutate → read round-trip asserting sibling-cell preservation.
+
 ### Added — hyperlinks (R8-4)
 
 - **`vsdx.hyperlinks.Hyperlink`** — per-hyperlink proxy over one
