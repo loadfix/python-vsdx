@@ -110,8 +110,25 @@ class VerbatimXmlPart(XmlPart):
         """Parse `blob` and stash both the original bytes and a
         fingerprint of the freshly-parsed element tree for later
         mutation detection.
+
+        The element tree is re-parsed through the vsdx-aware parser so
+        registered ``CT_*`` element classes (``CT_Pages``, ``CT_Page``,
+        ``CT_PageSheet``, ``CT_Section``, ``CT_Row``, ``CT_Cell``, …)
+        attach on load. Without this step the OPC default parser hands
+        back plain ``lxml.etree._Element`` trees and the proxy layer
+        cannot walk ``page_lst`` / ``row_lst`` / ``cell_lst`` — which
+        is how the authoring-path proxies find shapes and layers on a
+        reloaded document.
         """
+        # Dodge a hard import cycle: this module is imported during
+        # ``vsdx.oxml`` package initialisation in some code paths, so we
+        # resolve the parser lazily rather than at module scope.
+        from vsdx.oxml import parse_xml as _vsdx_parse_xml
+
         part = cast(VerbatimXmlPart, super().load(partname, content_type, package, blob))
+        # Replace the default-parser element with a vsdx-aware one so
+        # the registered CT_* classes are live.
+        part._element = cast("BaseOxmlElement", _vsdx_parse_xml(blob))
         part._source_blob = blob
         part._source_fingerprint = _canonical_dump(part._element)
         return part

@@ -157,6 +157,23 @@ class Layer:
         cell.set("V", _bool_to_v(bool(value)))
 
     @property
+    def print_(self) -> bool:
+        """Trailing-underscore alias for :attr:`print`.
+
+        ``print`` shadows the built-in; ``print_`` is provided as the
+        PEP-8-friendly spelling for callers who prefer to avoid the
+        keyword-shaped attribute name (matches python-pptx / python-docx
+        convention for ``print`` / ``class`` / etc.).
+
+        .. versionadded:: 0.3.0
+        """
+        return self.print
+
+    @print_.setter
+    def print_(self, value: bool) -> None:
+        self.print = value
+
+    @property
     def active(self) -> bool:
         return _cell_v_as_bool(_row_cell(self._row, "Active"))
 
@@ -174,6 +191,23 @@ class Layer:
     def locked(self, value: bool) -> None:
         cell = _get_or_add_row_cell(self._row, "Lock")
         cell.set("V", _bool_to_v(bool(value)))
+
+    @property
+    def lock(self) -> bool:
+        """Alias for :attr:`locked` matching the Visio cell-name spelling.
+
+        The underlying ``<Cell N="Lock" V="…">`` is named ``Lock``
+        singular; :attr:`locked` is the grammatical property name we
+        prefer, and :attr:`lock` is the literal cell-name spelling for
+        callers mapping directly off ECMA-376.
+
+        .. versionadded:: 0.3.0
+        """
+        return self.locked
+
+    @lock.setter
+    def lock(self, value: bool) -> None:
+        self.locked = value
 
     @property
     def snap(self) -> bool:
@@ -203,6 +237,35 @@ class Layer:
     def color(self, value: str) -> None:
         cell = _get_or_add_row_cell(self._row, "Color")
         cell.set("V", str(value))
+
+    # -- fluent setters -------------------------------------------------
+
+    def set_visible(self, value: bool) -> "Layer":
+        """Set :attr:`visible` and return self for chaining.
+
+        Convenience mutator matching the python-docx / python-pptx
+        ``set_…`` idiom, intended for the common case of toggling a
+        single cell without breaking the fluent call chain::
+
+            page.layers.add("Guides").set_visible(False).set_printable(False)
+
+        .. versionadded:: 0.3.0
+        """
+        self.visible = bool(value)
+        return self
+
+    def set_printable(self, value: bool) -> "Layer":
+        """Set :attr:`print` and return self for chaining.
+
+        See :meth:`set_visible` for the design rationale. The method is
+        spelt ``set_printable`` rather than ``set_print`` because
+        ``print`` is the Python built-in; the property keeps the Visio
+        cell-name spelling but the fluent form uses the adjective.
+
+        .. versionadded:: 0.3.0
+        """
+        self.print = bool(value)
+        return self
 
 
 # ---------------------------------------------------------------------------

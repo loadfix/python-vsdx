@@ -431,6 +431,40 @@ class Page(PartElementProxy):
 
         return Layers(self)
 
+    def add_layer(
+        self,
+        name: str,
+        visible: bool = True,
+        print_: bool = True,
+        color: str = "Themed",
+    ):
+        """Append a new layer to this page and return its proxy.
+
+        Thin convenience wrapper over ``page.layers.add(...)`` — provided
+        so the common case ("add one named layer to a page") reads
+        linearly on the :class:`Page` surface instead of dipping through
+        the :class:`~vsdx.layers.Layers` collection. The *print_* kwarg
+        avoids shadowing the built-in ``print``.
+
+        .. versionadded:: 0.3.0
+        """
+        # NB: Layers.add spells the printability kwarg as ``print=`` to
+        # match the Visio cell-name. We expose the PEP-8-friendly
+        # ``print_`` here and translate.
+        return self.layers.add(
+            name, visible=visible, print=print_, color=color
+        )
+
+    def layer(self, name: str):
+        """Return the layer on this page named *name*, or ``None``.
+
+        Equivalent to ``page.layers.get(name)`` — the short spelling is
+        convenient when passing a layer to ``Shape.add_to_layer(...)``.
+
+        .. versionadded:: 0.3.0
+        """
+        return self.layers.get(name)
+
     # -- background-page semantics --------------------------------------
 
     @property

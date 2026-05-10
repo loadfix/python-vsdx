@@ -59,16 +59,55 @@ class PagesPart(VerbatimXmlPart):
         Back-reference list populated by :meth:`add_page_part`. For
         parts loaded from disk that never went through :meth:`new`
         the list is lazily initialised by scanning the ``RT_VISIO_PAGE``
-        rels on first access.
+        rels on first access.  Each PagePart's
+        :attr:`~PagePart.page_element` back-reference is also wired
+        here — the authoring path sets it during :meth:`add_page_part`,
+        but on load we have to resolve it by matching each part's
+        source ``rId`` to the ``<Page><Rel r:id=…/></Page>`` entry in
+        the index document.
         """
         if "_page_parts_list" not in self.__dict__:
-            lst: list[PagePart] = []
+            # -- collect (rId, PagePart) pairs from rels --
+            part_by_rid: dict[str, PagePart] = {}
             for rel in self.rels.values():
                 if rel.is_external:
                     continue
                 target = rel.target_part
                 if isinstance(target, PagePart):
-                    lst.append(target)
+                    part_by_rid[rel.rId] = target
+
+            # -- iterate the <Page> entries in document order, match each
+            # -- entry's <Rel r:id> to its PagePart, and back-reference
+            # -- page_element. Pages without a matching rel fall out (the
+            # -- package is malformed); parts without an index entry are
+            # -- appended in rels-iteration order after the indexed set. --
+            lst: list[PagePart] = []
+            seen: set[str] = set()
+            ordered_entries = list(self.element.page_lst)
+            for page_el in ordered_entries:
+                rel_child = None
+                for child in page_el:
+                    if child.tag.endswith("}Rel"):
+                        rel_child = child
+                        break
+                if rel_child is None:
+                    continue
+                rId = rel_child.get(f"{{{NS_R}}}id")
+                if rId is None or rId not in part_by_rid:
+                    continue
+                part = part_by_rid[rId]
+                # Only wire the back-reference when it hasn't been set
+                # already — authoring-path PagePart instances have their
+                # page_element set during add_page_part.
+                if part.__dict__.get("_page_element") is None:
+                    part.page_element = page_el
+                lst.append(part)
+                seen.add(rId)
+            # Append orphan parts (rels without a matching <Page> entry)
+            # in rels-iteration order so they are still reachable.
+            for rId, part in part_by_rid.items():
+                if rId not in seen:
+                    lst.append(part)
             self.__dict__["_page_parts_list"] = lst
         return self.__dict__["_page_parts_list"]
 

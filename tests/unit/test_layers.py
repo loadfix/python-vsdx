@@ -138,6 +138,162 @@ class DescribeShapeLayerMembership:
         assert len(resolved) == 1
 
 
+class DescribePageLayerConvenience:
+    def it_adds_a_layer_via_page_add_layer(self) -> None:
+        _, page = _fresh_page()
+        layer = page.add_layer("Draft")
+        assert isinstance(layer, Layer)
+        assert layer.name == "Draft"
+        assert layer.visible is True
+        assert layer.print is True
+
+    def it_routes_print_underscore_through_add_layer(self) -> None:
+        _, page = _fresh_page()
+        hidden = page.add_layer("Guides", visible=False, print_=False)
+        assert hidden.visible is False
+        assert hidden.print is False
+        assert hidden.print_ is False  # alias agrees with ``print``
+
+    def it_looks_up_a_layer_via_page_layer(self) -> None:
+        _, page = _fresh_page()
+        page.add_layer("Alpha")
+        assert page.layer("Alpha") is not None
+        assert page.layer("Alpha").name == "Alpha"
+        assert page.layer("Missing") is None
+
+
+class DescribeLayerFluentSetters:
+    def it_supports_set_visible_chain(self) -> None:
+        _, page = _fresh_page()
+        layer = page.add_layer("Guides")
+        returned = layer.set_visible(False)
+        assert returned is layer  # fluent return
+        assert layer.visible is False
+
+    def it_supports_set_printable_chain(self) -> None:
+        _, page = _fresh_page()
+        layer = page.add_layer("Guides")
+        returned = layer.set_printable(False)
+        assert returned is layer
+        assert layer.print is False
+
+    def it_exposes_lock_as_an_alias_of_locked(self) -> None:
+        _, page = _fresh_page()
+        layer = page.add_layer("Guides")
+        layer.lock = True
+        assert layer.locked is True
+        assert layer.lock is True
+
+
+class DescribeShapeAddRemoveFromLayer:
+    def it_adds_a_shape_to_a_layer(self) -> None:
+        _, page = _fresh_page()
+        layer = page.add_layer("Draft")
+        shape = page.shapes[0]
+        shape.add_to_layer(layer)
+        assert [L.index for L in shape.layers] == [0]
+
+    def it_is_idempotent_on_double_add(self) -> None:
+        _, page = _fresh_page()
+        layer = page.add_layer("Draft")
+        shape = page.shapes[0]
+        shape.add_to_layer(layer)
+        shape.add_to_layer(layer)  # duplicate no-op
+        assert _shape_layer_indices(shape._element) == [0]
+
+    def it_appends_to_existing_memberships_preserving_order(self) -> None:
+        _, page = _fresh_page()
+        first = page.add_layer("First")
+        second = page.add_layer("Second")
+        third = page.add_layer("Third")
+        shape = page.shapes[0]
+        shape.add_to_layer(second)  # [1]
+        shape.add_to_layer(first)  # [1, 0]
+        shape.add_to_layer(third)  # [1, 0, 2]
+        assert _shape_layer_indices(shape._element) == [1, 0, 2]
+
+    def it_removes_a_shape_from_a_layer(self) -> None:
+        _, page = _fresh_page()
+        a = page.add_layer("A")
+        b = page.add_layer("B")
+        shape = page.shapes[0]
+        shape.set_layers([a, b])
+        shape.remove_from_layer(a)
+        assert _shape_layer_indices(shape._element) == [1]
+
+    def it_is_idempotent_on_remove_when_not_a_member(self) -> None:
+        _, page = _fresh_page()
+        a = page.add_layer("A")
+        b = page.add_layer("B")
+        shape = page.shapes[0]
+        shape.set_layers([a])
+        shape.remove_from_layer(b)  # b is not a member; no-op
+        assert _shape_layer_indices(shape._element) == [0]
+
+    def it_clears_the_cell_when_last_membership_removed(self) -> None:
+        _, page = _fresh_page()
+        solo = page.add_layer("Solo")
+        shape = page.shapes[0]
+        shape.add_to_layer(solo)
+        shape.remove_from_layer(solo)
+        assert _shape_layer_indices(shape._element) == []
+        # The cell itself should be gone.
+        assert not any(
+            cell.get("N") == "LayerMember"
+            for cell in shape._element.cell_lst
+        )
+
+
+class DescribeLayerPersistence:
+    """End-to-end: 3 shapes on 2 layers, toggle, save/reload, assert."""
+
+    def it_round_trips_layers_and_membership_through_save_reload(self) -> None:
+        import io
+
+        # -- build: 3 shapes on 2 layers --
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="P1")
+        draft = page.add_layer("Draft", visible=True, print_=True)
+        final = page.add_layer("Final", visible=True, print_=True)
+        s1 = page.shapes.add_shape(vsdx.VS_SHAPE_TYPE.RECTANGLE, at=(1, 1))
+        s2 = page.shapes.add_shape(vsdx.VS_SHAPE_TYPE.RECTANGLE, at=(2, 2))
+        s3 = page.shapes.add_shape(vsdx.VS_SHAPE_TYPE.RECTANGLE, at=(3, 3))
+        s1.add_to_layer(draft)
+        s2.add_to_layer(final)
+        s3.add_to_layer(draft)
+        s3.add_to_layer(final)
+        # -- toggle: Final layer goes invisible + non-printing via fluent form
+        final.set_visible(False).set_printable(False)
+
+        # -- save to a BytesIO, then open it again --
+        buf = io.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        reloaded = vsdx.Visio(buf)
+        rp = reloaded.pages[0]
+
+        # -- layer metadata survives --
+        rdraft = rp.layer("Draft")
+        rfinal = rp.layer("Final")
+        assert rdraft is not None and rfinal is not None
+        assert rdraft.visible is True
+        assert rdraft.print is True
+        assert rfinal.visible is False
+        assert rfinal.print is False
+        assert [L.name for L in rp.layers] == ["Draft", "Final"]
+
+        # -- shape membership survives --
+        memberships = [
+            sorted(L.index for L in shape.layers) for shape in rp.shapes
+        ]
+        # s1 -> [Draft], s2 -> [Final], s3 -> [Draft, Final]
+        assert memberships == [
+            [rdraft.index],
+            [rfinal.index],
+            sorted([rdraft.index, rfinal.index]),
+        ]
+
+
 class DescribeLayerDeleteRenumber:
     def it_renumbers_layers_on_delete(self) -> None:
         _, page = _fresh_page()

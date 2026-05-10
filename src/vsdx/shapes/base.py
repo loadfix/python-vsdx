@@ -288,6 +288,59 @@ class Shape(ParentedElementProxy):
         indices = [layer.index for layer in layers]
         _set_shape_layer_indices(self._element, indices)
 
+    def add_to_layer(self, layer) -> None:
+        """Add this shape to *layer* (idempotent).
+
+        Appends *layer.index* to the shape's ``<Cell N="LayerMember">``
+        value if it is not already present. Existing memberships are
+        preserved in their original declaration order — the new index
+        is appended to the tail, matching Visio desktop's append-on-add
+        behaviour.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.layers import (
+            _set_shape_layer_indices,
+            _shape_layer_indices,
+        )
+
+        current = _shape_layer_indices(self._element)
+        target = layer.index
+        if target in current:
+            return
+        _set_shape_layer_indices(self._element, current + [target])
+
+    def remove_from_layer(self, layer) -> None:
+        """Remove this shape from *layer* (idempotent).
+
+        Drops *layer.index* from the shape's ``<Cell N="LayerMember">``
+        value if present; leaves the remaining indices (and their
+        order) untouched. When the removal empties the list the cell
+        itself is cleaned up so a shape with no layers has no
+        ``LayerMember`` cell (matches
+        :func:`vsdx.layers._rewrite_shape_membership`).
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.layers import (
+            _set_shape_layer_indices,
+            _shape_layer_indices,
+        )
+
+        current = _shape_layer_indices(self._element)
+        target = layer.index
+        if target not in current:
+            return
+        remaining = [ix for ix in current if ix != target]
+        if remaining:
+            _set_shape_layer_indices(self._element, remaining)
+            return
+        # Clear the cell entirely when the shape loses all memberships.
+        shape_el = self._element
+        for cell in list(shape_el.cell_lst):
+            if cell.get("N") == "LayerMember":
+                shape_el.remove(cell)
+
     # -- data graphics --------------------------------------------------
 
     @property
