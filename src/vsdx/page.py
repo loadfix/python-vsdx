@@ -590,6 +590,47 @@ class Page(PartElementProxy):
             )
         self._page_part.relate_to(value.part, RT.THEME)
 
+    def set_effect_variant(self, index: int) -> None:
+        """Apply one of the theme's three effect variants to every shape.
+
+        :param index: ``0`` / ``1`` / ``2`` — a 0-based index into
+            :attr:`Theme.effect_variants` (subtle / moderate / intense).
+
+        For every :class:`~vsdx.shapes.base.Shape` on this page, writes
+        (or updates) a ``<Cell N="QuickStyleEffectMatrix" V="<n>">``
+        where ``<n>`` is the 1-based preset number corresponding to
+        *index* — the value Visio stores to look up the selected
+        effect style in the theme's ``a:effectStyleLst``.
+
+        Shapes with no effective theme still accept the write; the
+        Visio renderer falls back to its default effect chain when the
+        referenced preset is out of range in the theme. Group-shape
+        children are *not* traversed — only the top-level shapes on the
+        page receive the update. Callers that want deep application can
+        walk the shape tree manually.
+
+        Raises:
+
+        - :class:`TypeError` if *index* is not an ``int``;
+        - :class:`ValueError` if *index* is outside ``0 <= index < 3``.
+
+        .. versionadded:: 0.4.0
+        """
+        if not isinstance(index, int) or isinstance(index, bool):
+            raise TypeError(
+                "effect variant index must be an int, got %r"
+                % type(index).__name__
+            )
+        if index < 0 or index >= 3:
+            raise ValueError(
+                "effect variant index out of range: %d (expected 0, 1, or 2)"
+                % index
+            )
+        preset = index + 1
+        for shape in self.shapes:
+            cell = shape._element.get_or_add_cell("QuickStyleEffectMatrix")
+            cell.set("V", str(preset))
+
     # -- ink annotations ------------------------------------------------
 
     @property

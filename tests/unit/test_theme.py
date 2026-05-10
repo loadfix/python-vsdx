@@ -8,7 +8,14 @@ from ooxml_opc import RELATIONSHIP_TYPE as RT
 
 import vsdx
 from vsdx.parts.theme import ThemePart
-from vsdx.theme import ColorScheme, FontScheme, Theme
+from vsdx.theme import (
+    ColorScheme,
+    EffectVariant,
+    FontScheme,
+    FontVariation,
+    ShadowParams,
+    Theme,
+)
 
 _THEME_XML = (
     b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
@@ -434,3 +441,280 @@ class DescribePageThemeOverride:
         page = doc.pages.add_page(name="Page-1")
         with pytest.raises(TypeError, match="Theme or None"):
             page.theme = "nope"  # type: ignore[assignment]
+
+
+# -- effect variants + font variations ----------------------------------
+
+
+_THEME_WITH_EFFECTS = (
+    b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+    b'<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+    b' name="Effects">'
+    b"<a:themeElements>"
+    b'<a:clrScheme name="Effects"/>'
+    b"<a:fontScheme/>"
+    b'<a:fmtScheme name="Effects">'
+    b"<a:fillStyleLst/>"
+    b"<a:lnStyleLst/>"
+    b"<a:effectStyleLst>"
+    b"<a:effectStyle><a:effectLst/></a:effectStyle>"
+    b"<a:effectStyle><a:effectLst>"
+    b'<a:outerShdw blurRad="50800" dist="38100" dir="5400000"'
+    b' algn="t" rotWithShape="0">'
+    b'<a:srgbClr val="000000"><a:alpha val="40000"/></a:srgbClr>'
+    b"</a:outerShdw>"
+    b"</a:effectLst></a:effectStyle>"
+    b"<a:effectStyle><a:effectLst>"
+    b'<a:innerShdw blurRad="63500" dist="25400" dir="2700000">'
+    b'<a:srgbClr val="ff00aa"/>'
+    b"</a:innerShdw>"
+    b"</a:effectLst></a:effectStyle>"
+    # A 4th + 5th entry that must be ignored — only the first 3 are
+    # exposed as canonical DrawingML variants.
+    b"<a:effectStyle><a:effectLst/></a:effectStyle>"
+    b"<a:effectStyle><a:effectLst/></a:effectStyle>"
+    b"</a:effectStyleLst>"
+    b"<a:bgFillStyleLst/>"
+    b"</a:fmtScheme>"
+    b"</a:themeElements>"
+    b"</a:theme>"
+)
+
+
+_THEME_WITH_FONT_VARIATIONS = (
+    b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+    b'<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+    b"<a:themeElements>"
+    b"<a:fontVariations>"
+    b'<a:fontVariation name="primary">'
+    b'<a:majorFont><a:latin typeface="Inter"/></a:majorFont>'
+    b'<a:minorFont><a:latin typeface="Inter Tight"/></a:minorFont>'
+    b"</a:fontVariation>"
+    b"<a:fontVariation>"
+    b'<a:majorFont><a:latin typeface="Roboto"/></a:majorFont>'
+    b"</a:fontVariation>"
+    b"</a:fontVariations>"
+    b"</a:themeElements>"
+    b"</a:theme>"
+)
+
+
+class DescribeThemeEffectVariants:
+    def it_returns_an_empty_list_for_a_bare_theme(self) -> None:
+        proxy = _theme_from(_BARE_THEME_XML)
+
+        assert proxy.effect_variants == []
+
+    def it_returns_an_empty_list_when_fmt_scheme_has_no_effect_list(
+        self,
+    ) -> None:
+        xml = (
+            b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            b"<a:theme"
+            b' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+            b"<a:themeElements>"
+            b'<a:fmtScheme name="x">'
+            b"<a:fillStyleLst/>"
+            b"<a:lnStyleLst/>"
+            b"<a:bgFillStyleLst/>"
+            b"</a:fmtScheme>"
+            b"</a:themeElements>"
+            b"</a:theme>"
+        )
+        proxy = _theme_from(xml)
+
+        assert proxy.effect_variants == []
+
+    def it_exposes_three_named_variants(self) -> None:
+        proxy = _theme_from(_THEME_WITH_EFFECTS)
+
+        variants = proxy.effect_variants
+
+        assert len(variants) == 3
+        assert all(isinstance(v, EffectVariant) for v in variants)
+        assert [v.name for v in variants] == ["subtle", "moderate", "intense"]
+        assert [v.preset_num for v in variants] == [1, 2, 3]
+
+    def it_caps_at_the_canonical_three_when_theme_ships_more(self) -> None:
+        # The fixture ships five effect styles; the proxy truncates.
+        proxy = _theme_from(_THEME_WITH_EFFECTS)
+
+        assert len(proxy.effect_variants) == 3
+
+    def it_exposes_typed_outer_shadow_params(self) -> None:
+        variants = _theme_from(_THEME_WITH_EFFECTS).effect_variants
+
+        moderate = variants[1]
+        shadow = moderate.shadow_outer_params
+
+        assert isinstance(shadow, ShadowParams)
+        assert shadow.blur_rad == 50800
+        assert shadow.dist == 38100
+        assert shadow.direction == 5400000
+        assert shadow.color == "000000"
+
+    def it_exposes_typed_inner_shadow_params(self) -> None:
+        variants = _theme_from(_THEME_WITH_EFFECTS).effect_variants
+
+        intense = variants[2]
+        shadow = intense.shadow_inner_params
+
+        assert isinstance(shadow, ShadowParams)
+        assert shadow.blur_rad == 63500
+        assert shadow.dist == 25400
+        assert shadow.direction == 2700000
+        # Colour is normalised to uppercase.
+        assert shadow.color == "FF00AA"
+
+    def it_returns_none_shadow_params_for_variants_without_shadows(
+        self,
+    ) -> None:
+        variants = _theme_from(_THEME_WITH_EFFECTS).effect_variants
+
+        subtle = variants[0]
+
+        assert subtle.shadow_outer_params is None
+        assert subtle.shadow_inner_params is None
+
+    def it_returns_none_for_the_outer_shadow_of_an_inner_shadow_variant(
+        self,
+    ) -> None:
+        variants = _theme_from(_THEME_WITH_EFFECTS).effect_variants
+
+        intense = variants[2]
+
+        assert intense.shadow_outer_params is None
+
+
+class DescribeThemeFontVariations:
+    def it_returns_an_empty_list_for_a_bare_theme(self) -> None:
+        proxy = _theme_from(_BARE_THEME_XML)
+
+        assert proxy.font_variations == []
+
+    def it_returns_an_empty_list_when_default_visio_theme(self) -> None:
+        # The stock Office theme uses a vt:fontStylesGroup ext element
+        # rather than a:fontVariations — so the proxy must report [].
+        proxy = _theme_from(_THEME_XML)
+
+        assert proxy.font_variations == []
+
+    def it_parses_font_variation_entries(self) -> None:
+        proxy = _theme_from(_THEME_WITH_FONT_VARIATIONS)
+
+        variations = proxy.font_variations
+
+        assert len(variations) == 2
+        assert all(isinstance(v, FontVariation) for v in variations)
+        assert variations[0] == FontVariation(
+            name="primary",
+            major_latin_typeface="Inter",
+            minor_latin_typeface="Inter Tight",
+        )
+        assert variations[1] == FontVariation(
+            name=None,
+            major_latin_typeface="Roboto",
+            minor_latin_typeface=None,
+        )
+
+
+class DescribeThemeEffectsRoundTrip:
+    def it_survives_a_serialisation_round_trip(self) -> None:
+        proxy = _theme_from(_THEME_WITH_EFFECTS)
+
+        # Trigger blob regeneration via any name-preserving mutation.
+        proxy.name = "Effects"
+        blob = proxy.part.blob
+
+        reparsed = Theme(ThemePart.new(OpcPackage(), blob))
+        variants = reparsed.effect_variants
+
+        assert len(variants) == 3
+        assert variants[1].shadow_outer_params == ShadowParams(
+            blur_rad=50800,
+            dist=38100,
+            direction=5400000,
+            color="000000",
+        )
+        assert variants[2].shadow_inner_params is not None
+        assert variants[2].shadow_inner_params.color == "FF00AA"
+
+
+class DescribePageSetEffectVariant:
+    def it_writes_the_quickstyleeffectmatrix_cell_on_every_shape(
+        self,
+    ) -> None:
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="Page-1")
+        s1 = page.shapes.add_shape("Rectangle", at=(1, 1), size=(2, 1))
+        s2 = page.shapes.add_shape("Ellipse", at=(4, 1), size=(2, 1))
+
+        page.set_effect_variant(1)
+
+        for shape in (s1, s2):
+            cell = shape._get_cell("QuickStyleEffectMatrix")
+            assert cell is not None
+            # index 1 → preset 2 (moderate)
+            assert cell.get("V") == "2"
+
+    def it_updates_existing_quickstyleeffectmatrix_cells_in_place(
+        self,
+    ) -> None:
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="Page-1")
+        shape = page.shapes.add_shape("Rectangle", at=(1, 1), size=(2, 1))
+
+        page.set_effect_variant(2)
+        page.set_effect_variant(0)
+
+        cell = shape._get_cell("QuickStyleEffectMatrix")
+        assert cell is not None
+        # Only one such cell (the setter updates in place).
+        matching = [
+            c for c in shape._element.cell_lst
+            if c.get("N") == "QuickStyleEffectMatrix"
+        ]
+        assert len(matching) == 1
+        assert cell.get("V") == "1"
+
+    def it_accepts_preset_indexes_0_1_and_2(self) -> None:
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="Page-1")
+        shape = page.shapes.add_shape("Rectangle", at=(1, 1), size=(2, 1))
+
+        for index, expected in ((0, "1"), (1, "2"), (2, "3")):
+            page.set_effect_variant(index)
+            cell = shape._get_cell("QuickStyleEffectMatrix")
+            assert cell is not None
+            assert cell.get("V") == expected
+
+    def it_is_a_no_op_on_a_page_with_no_shapes(self) -> None:
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="Page-1")
+
+        # Must not raise.
+        page.set_effect_variant(0)
+
+    def it_rejects_non_int_index(self) -> None:
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="Page-1")
+
+        with pytest.raises(TypeError, match="must be an int"):
+            page.set_effect_variant("0")  # type: ignore[arg-type]
+
+    def it_rejects_bool_index(self) -> None:
+        # Python treats bool as int; reject it explicitly to avoid the
+        # silent True → 1 coercion from the caller's perspective.
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="Page-1")
+
+        with pytest.raises(TypeError, match="must be an int"):
+            page.set_effect_variant(True)  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize("index", [-1, 3, 99])
+    def it_rejects_out_of_range_indexes(self, index: int) -> None:
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="Page-1")
+
+        with pytest.raises(ValueError, match="out of range"):
+            page.set_effect_variant(index)
