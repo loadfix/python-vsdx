@@ -19,15 +19,24 @@ element and accessed via ``connector.connects``.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, ClassVar, Optional
 
 from vsdx.enum.shapes import VS_CONNECTOR_STYLE, VS_SHAPE_TYPE
 from vsdx.shapes.base import TextShape
 
 if TYPE_CHECKING:
+    from vsdx.connection_points import ConnectionPoint
     from vsdx.oxml._stubs import CT_Shape
     from vsdx.shapes.base import Shape
     from vsdx.shapes.shapetree import ShapeTree
+
+
+# ``Connections.X<n>`` / ``Connections.Y<n>`` — the cell-name Visio writes
+# on a ``<Connect>``'s ``@ToCell`` when a connector endpoint is glued to a
+# specific connection point on the anchor shape. Value ``PinX`` means
+# centre-pin glue instead of a numbered connection point.
+_CONNECTIONS_CELL_RE = re.compile(r"^Connections\.[XY](\d+)$")
 
 
 class Connector(TextShape):
@@ -101,6 +110,158 @@ class Connector(TextShape):
         self.end_x = float(to_shape.pin_x)
         self.end_y = float(to_shape.pin_y)
 
+    # -- typed endpoint proxies --------------------------------------------
+
+    def _find_glue_entry(self, from_cell: str):
+        """Return the ``<Connect>`` entry gluing this connector's *from_cell*.
+
+        Walks the owning page's ``<Connects>`` container and returns the
+        first entry whose ``@FromSheet`` matches this connector's shape
+        ID and whose ``@FromCell`` equals *from_cell* (``"BeginX"`` for
+        the source endpoint, ``"EndX"`` for the target).  Returns
+        ``None`` when no matching entry exists (the connector was
+        authored without glue — a degenerate but legal state).
+        """
+        tree = self._parent
+        page_contents = getattr(tree, "_element", None)
+        if page_contents is None:
+            return None
+        connects = getattr(page_contents, "connects", None)
+        if connects is None:
+            return None
+        my_id = str(self.shape_id)
+        for entry in connects.connect_lst:
+            if entry.get("FromSheet") == my_id and entry.get("FromCell") == from_cell:
+                return entry
+        return None
+
+    def _resolve_glue_shape(self, from_cell: str) -> Optional["Shape"]:
+        """Resolve the shape this connector's *from_cell* is glued to."""
+        entry = self._find_glue_entry(from_cell)
+        if entry is None:
+            return None
+        to_sheet = entry.get("ToSheet")
+        if to_sheet is None:
+            return None
+        try:
+            target_id = int(to_sheet)
+        except ValueError:
+            return None
+        tree = self._parent
+        # Avoid the connector proxy matching itself on some pathological
+        # self-glue — the common case is a distinct anchor shape.
+        for el in tree._element.shapes_element.shape_lst:
+            if int(el.shape_id or 0) == target_id:
+                return tree._proxy_for(el)
+        return None
+
+    def _resolve_glue_point(self, from_cell: str) -> Optional["ConnectionPoint"]:
+        """Resolve the :class:`ConnectionPoint` this endpoint targets, if any.
+
+        Returns ``None`` when the endpoint glues to the anchor shape's
+        centre-pin (``ToCell="PinX"``) instead of a numbered connection
+        point, or when the glue entry references a connection-point
+        index that does not exist on the resolved anchor shape.
+        """
+        entry = self._find_glue_entry(from_cell)
+        if entry is None:
+            return None
+        to_cell = entry.get("ToCell") or ""
+        match = _CONNECTIONS_CELL_RE.match(to_cell)
+        if match is None:
+            return None
+        # ``Connections.X<n>`` — ``<n>`` is 1-based in Visio.
+        ordinal = int(match.group(1))
+        shape = self._resolve_glue_shape(from_cell)
+        if shape is None:
+            return None
+        for point in shape.connection_points:
+            if point.index == ordinal:
+                return point
+        return None
+
+    @property
+    def source_shape(self) -> Optional["Shape"]:
+        """The shape this connector's ``BeginX`` endpoint is glued to.
+
+        Returns ``None`` for a degenerate connector authored without
+        begin-side glue.
+
+        .. versionadded:: 0.3.0
+        """
+        return self._resolve_glue_shape("BeginX")
+
+    @property
+    def target_shape(self) -> Optional["Shape"]:
+        """The shape this connector's ``EndX`` endpoint is glued to.
+
+        Returns ``None`` for a connector authored without end-side glue.
+
+        .. versionadded:: 0.3.0
+        """
+        return self._resolve_glue_shape("EndX")
+
+    @property
+    def source_point(self) -> Optional["ConnectionPoint"]:
+        """The :class:`ConnectionPoint` this connector's source is glued to, or ``None``.
+
+        Returns ``None`` when the endpoint glues to the source shape's
+        centre-pin (``ToCell="PinX"``) instead of a numbered connection
+        point.
+
+        .. versionadded:: 0.3.0
+        """
+        return self._resolve_glue_point("BeginX")
+
+    @property
+    def target_point(self) -> Optional["ConnectionPoint"]:
+        """The :class:`ConnectionPoint` this connector's target is glued to, or ``None``.
+
+        .. versionadded:: 0.3.0
+        """
+        return self._resolve_glue_point("EndX")
+
+    # -- route recomputation ------------------------------------------------
+
+    def reroute(self) -> None:
+        """Recompute the connector's endpoint coordinates from current glue.
+
+        For the dynamic-connector default (``RouteStyle`` absent or
+        ``RIGHT_ANGLE``), Visio recomputes the waypoint polyline at
+        render time from the endpoint coordinates plus the target-shape
+        bounding boxes — the authoring file only needs to carry the
+        ``BeginX`` / ``BeginY`` / ``EndX`` / ``EndY`` cells. This method
+        re-pulls those four cells from the currently-resolved source /
+        target shapes (or their specific connection points, when glued
+        that way).  Callers who have moved an anchor shape via
+        :meth:`Shape.set_geometry` can call :meth:`reroute` to snap the
+        connector to the new positions without rebuilding the
+        ``<Connect>`` entries.
+
+        No-op when either endpoint is unglued.
+
+        .. versionadded:: 0.3.0
+        """
+        src = self.source_shape
+        tgt = self.target_shape
+        src_point = self.source_point
+        tgt_point = self.target_point
+
+        if src is not None:
+            if src_point is not None:
+                wx, wy = _connection_point_world_xy(src, src_point)
+            else:
+                wx, wy = float(src.pin_x), float(src.pin_y)
+            self.begin_x = wx
+            self.begin_y = wy
+        if tgt is not None:
+            if tgt_point is not None:
+                wx, wy = _connection_point_world_xy(tgt, tgt_point)
+            else:
+                wx, wy = float(tgt.pin_x), float(tgt.pin_y)
+            self.end_x = wx
+            self.end_y = wy
+
 
 # -- local copies of the base module helpers (private to this file) ---------
 # Re-importing from vsdx.shapes.base would make connector look heavier in
@@ -125,6 +286,41 @@ def _set_cell_float(shape_el, name, value, unit="IN"):  # type: ignore[no-untype
     s = str(int(value)) if value == int(value) else ("%f" % value).rstrip("0").rstrip(".")
     cell.set("V", s)
     cell.set("U", unit)
+
+
+def _connection_point_world_xy(
+    shape: "Shape", point: "ConnectionPoint"
+) -> tuple[float, float]:
+    """Return the page-space (x, y) of *point* on *shape*, in inches.
+
+    Connection-point coordinates are stored in the shape's local frame.
+    This helper maps them to page coordinates using the simple Visio
+    default: the shape's pin is its local centre (``LocPinX = Width/2``
+    / ``LocPinY = Height/2``) and shape rotation is zero.  R14 does not
+    honour non-centre ``LocPinX/Y`` or non-zero ``Angle``; those are a
+    follow-up when rotation lands on the authoring surface.
+    """
+    lx = point.x or 0.0
+    ly = point.y or 0.0
+    w = float(shape.width) or 0.0
+    h = float(shape.height) or 0.0
+    origin_x = float(shape.pin_x) - w / 2.0
+    origin_y = float(shape.pin_y) - h / 2.0
+    return origin_x + lx, origin_y + ly
+
+
+def _shape_bbox(shape: "Shape") -> tuple[float, float, float, float]:
+    """Return *(left, bottom, right, top)* of *shape* in page-inches.
+
+    Approximation matches :func:`_connection_point_world_xy` — the pin
+    is assumed centred and rotation zero.  Used by :meth:`Page.connect`
+    to score candidate connection points for nearest-edge selection.
+    """
+    pin_x = float(shape.pin_x)
+    pin_y = float(shape.pin_y)
+    w = float(shape.width) or 0.0
+    h = float(shape.height) or 0.0
+    return pin_x - w / 2.0, pin_y - h / 2.0, pin_x + w / 2.0, pin_y + h / 2.0
 
 
 __all__ = ["Connector"]

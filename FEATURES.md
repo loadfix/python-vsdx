@@ -194,10 +194,82 @@ doc.save("strict.vsdx")
 - `VisioDocument.is_strict` — read / write the package's conformance
   flag. `[Added in 0.3.0]`
 
+## Connectors — auto-routing + typed endpoints
+
+Dynamic connectors are wired into a page with
+`Page.connect(source, target)` — the high-level helper that drops
+the connector `<Shape>`, writes the two `<Connect>` glue entries
+into the page's `<Connects>` element, and materialises the
+`BeginX` / `BeginY` / `EndX` / `EndY` endpoint cells so the file
+renders without a Visio desktop reroute pass.
+
+```python
+import vsdx
+
+doc = vsdx.Visio()
+page = doc.pages.add_page(name="Flow")
+a = page.shapes.add_shape("Rectangle", at=(1, 1), size=(2, 1))
+b = page.shapes.add_shape("Ellipse",   at=(6, 1), size=(2, 1))
+
+# simplest form — centre-pin glue (ToCell="PinX")
+c = page.connect(a, b)
+
+# glue to specific connection points
+pa = a.connection_points.add(2.0, 0.5)     # right edge of `a`
+pb = b.connection_points.add(0.0, 0.5)     # left edge of `b`
+c = page.connect(a, b, source_point=pa, target_point=pb)
+
+# recompute endpoint cells after moving an anchor
+a.pin_x = 3.0
+c.reroute()
+
+# connector neighbourhood on either anchor
+assert a.connections_out[0] is c
+assert b.connections_in[0] is c
+
+# typed endpoint proxies over the <Connect> rows
+assert c.source_shape is a
+assert c.target_shape is b
+assert c.source_point is pa
+assert c.target_point is pb
+```
+
+- `Page.connect(source_shape, target_shape, source_point=None,
+  target_point=None, connector_master="Dynamic connector")` — drop a
+  connector between two shapes. When `source_point` / `target_point`
+  are `None`, the nearest-edge connection point on each shape is
+  auto-picked (fallback: centre-pin glue, `ToCell="PinX"`). Specify
+  a `ConnectionPoint` to pin an endpoint to a specific anchor —
+  written as `ToCell="Connections.X<index>"`. `[Added in 0.3.0]`
+- `Shape.connections_in` — list of `Connector` instances whose target
+  endpoint (`FromCell="EndX"`) is glued to this shape. `[Added in 0.3.0]`
+- `Shape.connections_out` — list of `Connector` instances whose
+  source endpoint (`FromCell="BeginX"`) is glued to this shape.
+  `[Added in 0.3.0]`
+- `Connector.source_shape` / `Connector.target_shape` — the shapes
+  this connector's `BeginX` / `EndX` endpoints glue to. `None` on a
+  degenerate connector authored without glue entries. `[Added in
+  0.3.0]`
+- `Connector.source_point` / `Connector.target_point` — the
+  `ConnectionPoint` each endpoint is glued to, or `None` for
+  centre-pin (`ToCell="PinX"`) glue. `[Added in 0.3.0]`
+- `Connector.reroute()` — recompute the connector's `BeginX` /
+  `BeginY` / `EndX` / `EndY` cells from the currently-resolved glue
+  (source / target shapes, and their connection points when
+  specified). Use after a `Shape.set_geometry` / pin move to snap
+  the connector to the new anchor positions. No-op on an unglued
+  connector. `[Added in 0.3.0]`
+
+Geometry approximation: world-coordinate resolution of connection
+points assumes Visio's default `LocPinX = Width/2` / `LocPinY =
+Height/2` and zero rotation. Shapes with bespoke `LocPinX/Y` or
+non-zero `Angle` will draft slightly off-centre until rotation lands
+on the authoring surface.
+
 ---
 
 Sections for other feature areas (pages, shapes, masters, layers,
-text, connectors, hyperlinks, print setup, data graphics, scale,
-kind variants, templates, stencils, VBA passthrough, …) will be
-filled in as the 0.3.0 authoring surface stabilises. Until then
-see [CHANGELOG.md](CHANGELOG.md) and the per-package `CLAUDE.md`.
+text, hyperlinks, print setup, data graphics, scale, kind variants,
+templates, stencils, VBA passthrough, …) will be filled in as the
+0.3.0 authoring surface stabilises. Until then see
+[CHANGELOG.md](CHANGELOG.md) and the per-package `CLAUDE.md`.

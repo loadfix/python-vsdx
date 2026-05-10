@@ -6,6 +6,40 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — connector auto-routing + typed endpoints (R14-4)
+
+- **`vsdx.Page.connect(source, target, source_point=None,
+  target_point=None, connector_master="Dynamic connector")`** —
+  high-level helper that drops a connector shape linking two anchor
+  shapes, writes the two ``<Connect>`` glue entries, and materialises
+  the connector's endpoint cells.  When ``source_point`` /
+  ``target_point`` are ``None``, the nearest-edge connection point on
+  each shape is auto-picked (fallback: centre-pin glue,
+  ``ToCell="PinX"``).  Specific :class:`ConnectionPoint` instances
+  write ``ToCell="Connections.X<index>"``.
+- **`vsdx.shapes.Shape.connections_in`** / **`.connections_out`** —
+  lists of :class:`~vsdx.shapes.Connector` instances whose target
+  (``EndX``) / source (``BeginX``) endpoint is glued to this shape.
+- **`vsdx.shapes.Connector.source_shape`** / **`.target_shape`** —
+  typed proxies over the ``<Connect>`` rows resolving the two
+  anchor-glue shapes, or ``None`` for unglued endpoints.
+- **`vsdx.shapes.Connector.source_point`** / **`.target_point`** —
+  typed :class:`~vsdx.connection_points.ConnectionPoint` proxies when
+  the endpoint glues to a numbered connection point; ``None`` for
+  centre-pin glue (``ToCell="PinX"``).
+- **`vsdx.shapes.Connector.reroute()`** — recompute the connector's
+  ``BeginX`` / ``BeginY`` / ``EndX`` / ``EndY`` cells from the
+  currently-resolved source/target shapes (or their specific
+  connection points).  Use after a ``Shape.set_geometry`` / pin move
+  to snap the connector to the new anchor positions.  No-op on an
+  unglued connector.
+
+Known limitation: world-coordinate resolution of connection points
+assumes Visio's default ``LocPinX = Width/2`` / ``LocPinY = Height/2``
+and zero rotation.  Shapes with bespoke ``LocPinX/Y`` or non-zero
+``Angle`` will draft slightly off-centre until rotation lands on the
+authoring surface.
+
 ### Added — password-protected save/open via `python-ooxml-crypto` 0.3 (R12-2)
 
 - **`vsdx.VisioDocument.save(target, password=None)`** — when

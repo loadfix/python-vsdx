@@ -21,12 +21,15 @@ from vsdx.theme import Theme
 from vsdx.util import Inches, Length, lazyproperty
 
 if TYPE_CHECKING:
+    from vsdx.connection_points import ConnectionPoint
     from vsdx.document import VisioDocument
     from vsdx.ink import InkStroke
     from vsdx.layers import Layers
     from vsdx.oxml._stubs import CT_Cell, CT_Page, CT_PageSheet  # TODO(vsdx/track-1)
     from vsdx.parts._stubs import PagePart, PagesPart  # TODO(vsdx/track-2)
     from vsdx.print_setup import PrintSetup
+    from vsdx.shapes.base import Shape
+    from vsdx.shapes.connector import Connector
 
 
 class Page(PartElementProxy):
@@ -312,6 +315,102 @@ class Page(PartElementProxy):
     def next_shape_id(self) -> int:
         """Allocate a fresh ``@ID`` for a new shape on this page."""
         return self._page_part.allocate_shape_id()
+
+    # -- high-level connector authoring --------------------------------
+
+    def connect(
+        self,
+        source_shape: "Shape",
+        target_shape: "Shape",
+        source_point: "Optional[ConnectionPoint]" = None,
+        target_point: "Optional[ConnectionPoint]" = None,
+        connector_master: str = "Dynamic connector",
+    ) -> "Connector":
+        """Drop a connector shape linking *source_shape* to *target_shape*.
+
+        High-level authoring surface on top of
+        :meth:`ShapeTree.add_connector`.  The instantiated connector is
+        an instance of *connector_master* (default: the built-in
+        ``"Dynamic connector"`` master).  Glue is written into the
+        page's ``<Connects>`` element as two ``<Connect>`` entries
+        (``BeginX`` → source, ``EndX`` → target).
+
+        *source_point* / *target_point* control which anchor on each
+        shape the glue references:
+
+        - :class:`None` (default) — nearest-edge auto-pick. If the
+          shape has connection points, the one closest to the opposite
+          shape's centre-pin is chosen; otherwise the endpoint glues to
+          the centre-pin (``ToCell="PinX"``).
+        - A specific :class:`ConnectionPoint` — written verbatim as
+          ``ToCell="Connections.X<index>"``.
+
+        The connector's ``BeginX`` / ``BeginY`` / ``EndX`` / ``EndY``
+        cells are materialised to match the chosen endpoints' world
+        coordinates, so the emitted file renders without a Visio
+        reroute pass.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.shapes.connector import (
+            Connector,
+            _connection_point_world_xy,
+        )
+
+        shape_el = self.shapes._element.shapes_element.add_shape(
+            master_name_u=connector_master
+        )
+        shape_el.shape_id = self.next_shape_id()
+        conn = Connector(shape_el, self.shapes)
+
+        # Auto-pick nearest-edge points when not specified.
+        if source_point is None:
+            source_point = _nearest_connection_point(source_shape, target_shape)
+        if target_point is None:
+            target_point = _nearest_connection_point(target_shape, source_shape)
+
+        # Write begin / end cells from the (possibly resolved) endpoints.
+        if source_point is not None:
+            bx, by = _connection_point_world_xy(source_shape, source_point)
+        else:
+            bx, by = float(source_shape.pin_x), float(source_shape.pin_y)
+        if target_point is not None:
+            ex, ey = _connection_point_world_xy(target_shape, target_point)
+        else:
+            ex, ey = float(target_shape.pin_x), float(target_shape.pin_y)
+        conn.begin_x = bx
+        conn.begin_y = by
+        conn.end_x = ex
+        conn.end_y = ey
+
+        # Write the two <Connect> glue entries.  When glued to a
+        # specific connection point we use the ``Connections.X<n>``
+        # cell-reference form; centre-pin glue uses the simpler
+        # ``ToCell="PinX"`` form.
+        connects = self.shapes._element.connects_element
+        source_to_cell = (
+            "Connections.X%d" % source_point.index
+            if source_point is not None
+            else "PinX"
+        )
+        target_to_cell = (
+            "Connections.X%d" % target_point.index
+            if target_point is not None
+            else "PinX"
+        )
+        connects.add_connect(
+            from_sheet=str(conn.shape_id),
+            to_sheet=str(source_shape.shape_id),
+            from_cell="BeginX",
+            to_cell=source_to_cell,
+        )
+        connects.add_connect(
+            from_sheet=str(conn.shape_id),
+            to_sheet=str(target_shape.shape_id),
+            from_cell="EndX",
+            to_cell=target_to_cell,
+        )
+        return conn
 
     # -- layers ---------------------------------------------------------
 
@@ -714,6 +813,36 @@ def _fmt(value: float) -> str:
     if value == int(value):
         return str(int(value))
     return ("%f" % value).rstrip("0").rstrip(".")
+
+
+def _nearest_connection_point(
+    shape: "Shape", other: "Shape"
+) -> "Optional[ConnectionPoint]":
+    """Return the connection point on *shape* closest to *other*'s centre-pin.
+
+    Returns ``None`` when *shape* has no connection points (the caller
+    then falls back to centre-pin glue).  Distance is scored in page
+    coordinates using the simple ``LocPinX/Y = size/2`` assumption —
+    see :func:`vsdx.shapes.connector._connection_point_world_xy`.
+    """
+    from vsdx.shapes.connector import _connection_point_world_xy
+
+    points = list(shape.connection_points)
+    if not points:
+        return None
+    other_x = float(other.pin_x)
+    other_y = float(other.pin_y)
+    best: "Optional[ConnectionPoint]" = None
+    best_d2 = float("inf")
+    for point in points:
+        wx, wy = _connection_point_world_xy(shape, point)
+        dx = wx - other_x
+        dy = wy - other_y
+        d2 = dx * dx + dy * dy
+        if d2 < best_d2:
+            best_d2 = d2
+            best = point
+    return best
 
 
 __all__ = ["Page", "Pages"]

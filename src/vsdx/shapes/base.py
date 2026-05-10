@@ -478,6 +478,93 @@ class Shape(ParentedElementProxy):
 
         return HyperlinkCollection(self)
 
+    # -- connector attachments -----------------------------------------
+
+    def _owning_page_contents(self):
+        """Walk up the proxy tree to the owning ``<PageContents>``.
+
+        Returns ``None`` when the shape was constructed outside a
+        :class:`ShapeTree` — unit-test oxml-only fixtures fall in this
+        bucket and silently yield empty connector lists.
+        """
+        from vsdx.shapes.shapetree import ShapeTree
+
+        tree = self._parent
+        while tree is not None and not isinstance(tree, ShapeTree):
+            tree = getattr(tree, "_parent", None)
+        if tree is None:
+            return tree, None
+        return tree, tree._element
+
+    def _connector_proxies_for(self, from_cell: str):
+        """Return the :class:`Connector` proxies gluing *this* shape on *from_cell*.
+
+        *from_cell* is ``"EndX"`` (for :attr:`connections_in` — the
+        target-side glue) or ``"BeginX"`` (for :attr:`connections_out` —
+        the source-side glue).  Walks the owning page's ``<Connects>``
+        element; every matching entry resolves to the connector shape
+        with the same ``@FromSheet`` ID.
+        """
+        from vsdx.shapes.connector import Connector
+
+        tree, page_contents = self._owning_page_contents()
+        if tree is None or page_contents is None:
+            return []
+        connects = getattr(page_contents, "connects", None)
+        if connects is None:
+            return []
+        my_id = str(self.shape_id)
+        connector_ids: list[int] = []
+        seen: set[int] = set()
+        for entry in connects.connect_lst:
+            if entry.get("FromCell") != from_cell:
+                continue
+            if entry.get("ToSheet") != my_id:
+                continue
+            from_sheet = entry.get("FromSheet")
+            if from_sheet is None:
+                continue
+            try:
+                fsid = int(from_sheet)
+            except ValueError:
+                continue
+            if fsid in seen:
+                continue
+            seen.add(fsid)
+            connector_ids.append(fsid)
+        connectors: list[Connector] = []
+        for fsid in connector_ids:
+            for el in page_contents.shapes_element.shape_lst:
+                if int(el.shape_id or 0) == fsid:
+                    connectors.append(Connector(el, tree))
+                    break
+        return connectors
+
+    @property
+    def connections_in(self):
+        """:class:`Connector` instances whose *target* endpoint glues to this shape.
+
+        Walks the owning page's ``<Connects>`` for entries with
+        ``@FromCell="EndX"`` and ``@ToSheet`` matching this shape's ID,
+        resolving each to the connector shape at ``@FromSheet``.
+        Returns ``[]`` when this shape is unparented or when no such
+        glue exists.
+
+        .. versionadded:: 0.3.0
+        """
+        return self._connector_proxies_for("EndX")
+
+    @property
+    def connections_out(self):
+        """:class:`Connector` instances whose *source* endpoint glues to this shape.
+
+        Mirror of :attr:`connections_in` against ``@FromCell="BeginX"``
+        glue entries.
+
+        .. versionadded:: 0.3.0
+        """
+        return self._connector_proxies_for("BeginX")
+
     # -- connection points ---------------------------------------------
 
     @property
