@@ -17,7 +17,8 @@ type / namespace identifiers the packaging layer needs.
 
 from __future__ import annotations
 
-from vsdx.api import Stencil, Template, Visio, VisioPackageOpener
+from vsdx.api import Template, Visio, VisioPackageOpener
+from vsdx.stencil import Stencil
 from vsdx.connection_points import (
     CONNECTION_TYPE,
     ConnectionPoint,

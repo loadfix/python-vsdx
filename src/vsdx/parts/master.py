@@ -63,14 +63,41 @@ class MastersPart(VerbatimXmlPart):
         access for parts loaded from disk (see
         :attr:`vsdx.parts.page.PagesPart._page_parts` for the
         equivalent pattern on the pages side).
+
+        For parts loaded from disk, also wires the ``master_element``
+        back-reference on each :class:`MasterPart` by pairing it with
+        the matching ``<Master>`` index entry via the ``r:id`` rel-id.
+        That back-reference lets the :class:`~vsdx.master.Master`
+        proxy read identifying attributes (``@NameU`` / ``@Name``)
+        after a round-trip.
+
+        .. versionchanged:: 0.3.0
+           Wires ``master_element`` on each child on load.
         """
         if "_master_parts_list" not in self.__dict__:
+            # Build a ``rId`` → ``<Master>`` index-entry lookup. On a
+            # Visio-desktop-authored masters.xml each ``<Master>``
+            # carries a ``<Rel r:id="rIdN"/>`` pointing at its part;
+            # we use that to hand each MasterPart back its index entry.
+            rid_to_master_el: dict[str, object] = {}
+            for master_el in self.element.master_lst:
+                rel_el = getattr(master_el, "rel", None)
+                if rel_el is None:
+                    continue
+                rid = rel_el.get(f"{{{NS_R}}}id") or rel_el.rId
+                if rid:
+                    rid_to_master_el[rid] = master_el
+
             lst: list[MasterPart] = []
-            for rel in self.rels.values():
+            for rId, rel in self.rels.items():
                 if rel.is_external:
                     continue
                 target = rel.target_part
                 if isinstance(target, MasterPart):
+                    # Wire the back-reference once (first load wins —
+                    # an authored part may already carry a fresh one).
+                    if target.master_element is None:
+                        target.master_element = rid_to_master_el.get(rId)
                     lst.append(target)
             self.__dict__["_master_parts_list"] = lst
         return self.__dict__["_master_parts_list"]
@@ -148,3 +175,20 @@ class MasterPart(VerbatimXmlPart):
     @master_element.setter
     def master_element(self, value) -> None:
         self.__dict__["_master_element"] = value
+
+    def allocate_shape_id(self) -> int:
+        """Return the next fresh shape ID for this master, starting at 1.
+
+        Mirror of :meth:`vsdx.parts.page.PagePart.allocate_shape_id` —
+        Visio shape IDs are *sheet-scoped*, meaning every master's
+        ``<MasterContents>`` carries its own monotonic counter
+        independent of every other master and every page. Used by
+        :meth:`vsdx.master.Master.add_shape` when stamping build-time
+        shapes into the master's shape tree.
+
+        .. versionadded:: 0.3.0
+        """
+        current = self.__dict__.get("_shape_id_counter", 0)
+        next_id = current + 1
+        self.__dict__["_shape_id_counter"] = next_id
+        return next_id

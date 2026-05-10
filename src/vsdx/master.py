@@ -148,6 +148,63 @@ class Master(PartElementProxy):
             return None
         return text_el.text or None
 
+    # -- build-time shape authoring -------------------------------------
+
+    def add_shape(
+        self,
+        name: str,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+    ) -> Any:
+        """Append a ``<Shape>`` to this master's ``<MasterContents>``.
+
+        Build-time complement of :meth:`~vsdx.shapes.shapetree.ShapeTree.add_shape`
+        — where that method drops a shape on a page, this one stamps a
+        shape into the master's own shape tree so it appears every time
+        the master is instantiated.
+
+        :param name: NameU / Name attribute for the shape (Visio's
+            master-contents shapes are usually named after the master,
+            e.g. ``"Sheet.1"``; *name* is written into both ``@Name``
+            and ``@NameU``).
+        :param x: PinX in inches.
+        :param y: PinY in inches.
+        :param width: Width in inches.
+        :param height: Height in inches.
+        :returns: the raw ``CT_Shape`` element. The caller can stash it
+            for further cell customisation; the element is live-bound
+            to the master part's XML tree.
+
+        .. versionadded:: 0.3.0
+        """
+        # -- local import: avoid cycle with vsdx.shapes → vsdx.master --
+        from vsdx.shapes.base import _fmt_num
+
+        part = self._master_part
+        contents = part.element
+        shape_el = contents.shapes_element.add_shape()
+        shape_el.set("Name", name)
+        shape_el.set("NameU", name)
+        shape_el.shape_id = part.allocate_shape_id()
+
+        # Stamp the four geometry cells. Use the named-cell convention
+        # the proxy uses everywhere else — create ``<Cell N=... V=...
+        # U="IN"/>`` children on the shape element, ordered PinX /
+        # PinY / Width / Height to match what Visio desktop emits.
+        for cell_name, value in (
+            ("PinX", x),
+            ("PinY", y),
+            ("Width", width),
+            ("Height", height),
+        ):
+            cell = shape_el.get_or_add_cell(cell_name)
+            cell.set("N", cell_name)
+            cell.set("V", _fmt_num(float(value)))
+            cell.set("U", "IN")
+        return shape_el
+
 
 class Masters(ParentedElementProxy):
     """Collection of masters on a :class:`~vsdx.document.VisioDocument`.

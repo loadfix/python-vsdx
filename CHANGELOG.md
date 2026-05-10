@@ -6,6 +6,34 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — stencil builder API (R16-2)
+
+- **`vsdx.Stencil`** is now a class with authoring-first classmethods
+  alongside the pre-existing load factory. ``Stencil()`` with no
+  argument still returns a :class:`VisioDocument` for backwards
+  compatibility with the 0.2.0 factory; ``Stencil.new()`` returns a
+  dedicated ``Stencil`` instance wrapping a fresh stencil package.
+- **`Stencil.add_master(name, width, height, content_callback=None)`** —
+  append a new master, stamp ``Width`` / ``Height`` cells on its
+  index-level ``<PageSheet>``, and optionally invoke
+  ``content_callback(master)`` so the caller can populate shapes
+  inline.
+- **`Master.add_shape(name, x, y, width, height)`** — build-time
+  shape-authoring complement of :meth:`ShapeTree.add_shape`; stamps a
+  ``<Shape>`` into the master's ``<MasterContents>`` with named
+  geometry cells (``PinX`` / ``PinY`` / ``Width`` / ``Height``) and a
+  sheet-scoped ID.
+- **`Stencil.save(path)`** — write the stencil out as ``.vssx`` via
+  the underlying :class:`VisioDocument` save path.
+- **`Stencil.from_shape_library(shapes)`** — bulk-import an iterable
+  of ``(name, payload_bytes)`` pairs; each pair becomes a master and
+  the bytes are stashed on ``master._payload`` for caller round-trip.
+- Load path: :attr:`MastersPart._master_parts` now wires each
+  :class:`MasterPart`'s ``master_element`` back-reference from the
+  loaded ``<Master>`` index entries (paired via ``r:id``), so
+  loaded-from-disk masters expose ``@NameU`` / ``@Name`` / ``@ID``
+  through the proxy after a round-trip.
+
 ### Added — connector auto-routing + typed endpoints (R14-4)
 
 - **`vsdx.Page.connect(source, target, source_point=None,
