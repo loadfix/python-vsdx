@@ -715,6 +715,35 @@ class Page(PartElementProxy):
         )
         return InkStroke(trace, ink_part.ink)
 
+    # -- SVG export -----------------------------------------------------
+
+    def to_svg(self, path: Optional[str] = None) -> str:
+        """Render this page as a minimal standalone SVG document.
+
+        When *path* is ``None`` (default) the SVG is returned as a
+        string. Passing *path* writes the document to that location
+        (UTF-8, overwriting any existing file) and also returns the
+        same string.
+
+        Only the primitive shape kinds ship today — rectangles,
+        ellipses, plain text, and straight-line connectors. Anything
+        else renders as a zero-size placeholder ``<rect>`` with an
+        ``<!-- unsupported shape -->`` comment so the export
+        continues end-to-end. See :mod:`vsdx.svg` for the full
+        conventions, coordinate translation (Visio bottom-left-in →
+        SVG top-left-px at 96 DPI), and the security note on text
+        escaping.
+
+        .. versionadded:: 0.2.0
+        """
+        # Deferred import — svg.page_to_svg reaches back into shape
+        # subclasses, which ultimately import from :class:`Page`.
+        from vsdx.svg import page_to_svg, write_page_svg
+
+        if path is None:
+            return page_to_svg(self)
+        return write_page_svg(self, path)
+
     # -- navigation -----------------------------------------------------
 
     @property

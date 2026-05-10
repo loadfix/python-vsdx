@@ -201,6 +201,26 @@ class VisioDocument(PartElementProxy):
             result.extend(page.ink_strokes)
         return result
 
+    # -- SVG batch export ------------------------------------------------
+
+    def to_svg_all(self, directory: str) -> list[str]:
+        """Render every page in this document into *directory* as SVG.
+
+        *directory* is created if it does not exist. Each page emits
+        a ``page-<index>-<safe-name>.svg`` file; the returned list
+        carries the written paths in page-iteration order so callers
+        can tee into a manifest or assemble a lightweight HTML
+        gallery.
+
+        See :meth:`vsdx.page.Page.to_svg` for the supported-shape
+        list and the scale / coordinate conventions.
+
+        .. versionadded:: 0.2.0
+        """
+        from vsdx.svg import document_to_svg_all
+
+        return document_to_svg_all(self, directory)
+
     # -- convenience ----------------------------------------------------
 
     @property

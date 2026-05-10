@@ -266,6 +266,67 @@ Height/2` and zero rotation. Shapes with bespoke `LocPinX/Y` or
 non-zero `Angle` will draft slightly off-centre until rotation lands
 on the authoring surface.
 
+## SVG export — minimal page renderer
+
+Pages render to standalone SVG 1.1 documents without spinning up
+Visio. Designed for dashboards, PR previews, and doc-site galleries
+where fidelity matters less than "see the diagram, now, in a
+browser". Only the common shape kinds ship today — rectangles,
+ellipses, plain text, and straight-line connectors — but the export
+continues end-to-end when an unsupported shape is hit (placeholder
+`<rect>` + `<!-- unsupported shape: master=... -->` comment).
+
+```python
+import vsdx
+
+doc = vsdx.Visio()
+page = doc.pages.add_page(name="Flow")
+a = page.shapes.add_shape("Rectangle", at=(1, 9), size=(2, 1), text="Start")
+b = page.shapes.add_shape("Ellipse",   at=(5, 9), size=(2, 1), text="End")
+page.shapes.add_connector(a, b)
+
+# string form — embed in HTML <iframe srcdoc> or return from a web handler
+svg = page.to_svg()
+
+# write to disk
+page.to_svg("flow.svg")
+
+# batch-export every page in the document
+paths = doc.to_svg_all("./out/")
+```
+
+- **`Page.to_svg(path=None)`** — render this page as an SVG 1.1
+  document string. Pass a path to additionally write the result to
+  disk (UTF-8, overwriting existing files). The string is always
+  returned so callers can tee the export into a manifest. `[Added in
+  0.2.0]`
+- **`VisioDocument.to_svg_all(directory)`** — batch-export every
+  page into *directory* (created if absent). Filenames follow
+  `page-<index>-<safe-name>.svg`; returns the ordered list of paths
+  written. `[Added in 0.2.0]`
+
+Coordinates translate Visio's bottom-left-inches origin to SVG's
+top-left-pixel origin at `1 inch = 96 px` (the SVG default DPI).
+Shape positioning:
+
+- Rectangle — `<rect>` anchored at the pin's top-left corner
+  (`pin_x - width/2`, `pin_y + height/2`) after the Y-flip.
+- Ellipse — `<ellipse>` centred on the pin with `rx = width/2` / `ry
+  = height/2`.
+- Text — `<text>` anchored at the pin with `text-anchor="middle"` /
+  `dominant-baseline="middle"`. Authored text content is
+  HTML-escaped before emission so a shape carrying
+  `"<script>alert(1)</script>"` cannot inject live markup into the
+  SVG. Font-family defaults to `Calibri, sans-serif` at 12 px.
+- Connector — `<line>` from `BeginX` / `BeginY` to `EndX` / `EndY`,
+  no arrowheads or waypoint routing.
+
+Fill + stroke colours read from the shape's `FillForegnd` +
+`LineColor` cells (6-hex-digit RGB; theme-index and `THEMEGUARD(...)`
+values fall back to the defaults of white + black). Dashed strokes,
+gradients, images, curves, rotation, and text wrapping are
+deliberately out of scope for the minimal renderer.
+
 ---
 
 Sections for other feature areas (pages, shapes, masters, layers,
