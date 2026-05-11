@@ -10,10 +10,11 @@ class DescribeVersion:
         assert isinstance(vsdx.__version__, str)
         assert vsdx.__version__.startswith("0.")
 
-    def it_reports_the_0_2_0_dev_version(self) -> None:
-        # 0.2.0 is the active release-in-progress per
-        # audits/2026-05-09-vsdx-0.2-scoping.md.
-        assert vsdx.__version__ == "0.2.0.dev0"
+    def it_reports_the_0_2_1_dev_version(self) -> None:
+        # Patch-bump from 0.2.0.dev0 following the wave-12 security
+        # fixes (formula depth cap, input-size cap, redacted
+        # connection string helper).
+        assert vsdx.__version__ == "0.2.1.dev0"
 
 
 class DescribePublicConstants:

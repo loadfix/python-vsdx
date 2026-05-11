@@ -106,7 +106,7 @@ from vsdx.text import Paragraph, Run, TextFrame
 from vsdx.theme import ColorScheme, FontScheme, Theme
 from vsdx.util import Cm, Emu, Inches, Length, Mm, Pt
 
-__version__ = "0.2.0.dev0"
+__version__ = "0.2.1.dev0"
 
 __all__ = [
     "CT_VSDX_DRAWING_MAIN",
