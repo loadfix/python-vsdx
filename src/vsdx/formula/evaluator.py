@@ -14,7 +14,7 @@ from typing import Optional, Union
 
 from vsdx.formula.builtins import BUILTINS, _to_bool, _to_number, _to_string
 from vsdx.formula.context import ShapeSheetContext
-from vsdx.formula.errors import FormulaEvaluationError
+from vsdx.formula.errors import FormulaDepthError, FormulaEvaluationError
 from vsdx.formula.nodes import (
     BinaryOp,
     BoolLiteral,
@@ -26,7 +26,7 @@ from vsdx.formula.nodes import (
     StringLiteral,
     UnaryOp,
 )
-from vsdx.formula.parser import parse
+from vsdx.formula.parser import DEFAULT_MAX_DEPTH, parse
 
 # Functions that need non-standard (lazy / context-aware) evaluation and
 # therefore cannot go through the default eager-eval BUILTINS dispatch.
@@ -44,8 +44,15 @@ class Evaluator:
     one-shot use see the module-level :func:`evaluate` convenience.
     """
 
-    def __init__(self, context: Optional[ShapeSheetContext] = None):
+    def __init__(
+        self,
+        context: Optional[ShapeSheetContext] = None,
+        *,
+        max_depth: int = DEFAULT_MAX_DEPTH,
+    ):
         self._context = context
+        self._max_depth = max_depth
+        self._depth = 0
 
     @property
     def context(self) -> Optional[ShapeSheetContext]:
@@ -56,21 +63,34 @@ class Evaluator:
         return self._eval(node)
 
     def _eval(self, node: Node) -> FormulaValue:
-        if isinstance(node, NumberLiteral):
-            return node.value
-        if isinstance(node, StringLiteral):
-            return node.value
-        if isinstance(node, BoolLiteral):
-            return node.value
-        if isinstance(node, CellRef):
-            return self._resolve_cell(node)
-        if isinstance(node, UnaryOp):
-            return self._eval_unary(node)
-        if isinstance(node, BinaryOp):
-            return self._eval_binary(node)
-        if isinstance(node, FunctionCall):
-            return self._eval_function(node)
-        raise FormulaEvaluationError(f"unknown AST node: {type(node).__name__}")
+        # Single shared recursion counter. Each ``_eval`` descent
+        # increments; the guard fires when a crafted AST (deeply nested
+        # unary, power chain, or function-call tree that somehow escaped
+        # the parser cap) would overflow CPython's ~1000-frame limit.
+        self._depth += 1
+        if self._depth > self._max_depth:
+            self._depth -= 1
+            raise FormulaDepthError(
+                f"formula AST evaluation exceeds max_depth={self._max_depth}"
+            )
+        try:
+            if isinstance(node, NumberLiteral):
+                return node.value
+            if isinstance(node, StringLiteral):
+                return node.value
+            if isinstance(node, BoolLiteral):
+                return node.value
+            if isinstance(node, CellRef):
+                return self._resolve_cell(node)
+            if isinstance(node, UnaryOp):
+                return self._eval_unary(node)
+            if isinstance(node, BinaryOp):
+                return self._eval_binary(node)
+            if isinstance(node, FunctionCall):
+                return self._eval_function(node)
+            raise FormulaEvaluationError(f"unknown AST node: {type(node).__name__}")
+        finally:
+            self._depth -= 1
 
     def _resolve_cell(self, ref: CellRef) -> FormulaValue:
         if self._context is None:
@@ -214,11 +234,22 @@ class Evaluator:
 def evaluate(
     source_or_ast: Union[str, Node],
     context: Optional[ShapeSheetContext] = None,
+    *,
+    max_depth: int = DEFAULT_MAX_DEPTH,
 ) -> FormulaValue:
     """Evaluate a formula string or AST against ``context``.
 
     String input is parsed first. Callers that evaluate the same formula
     many times should parse once and pass the AST directly.
+
+    ``max_depth`` (default 256) caps both the parser's recursive descent
+    and the evaluator's AST walk; crafted inputs that exceed the cap
+    raise :class:`~vsdx.formula.errors.FormulaDepthError` rather than
+    the thread-poisoning :class:`RecursionError`.
     """
-    ast = parse(source_or_ast) if isinstance(source_or_ast, str) else source_or_ast
-    return Evaluator(context).eval_ast(ast)
+    ast = (
+        parse(source_or_ast, max_depth=max_depth)
+        if isinstance(source_or_ast, str)
+        else source_or_ast
+    )
+    return Evaluator(context, max_depth=max_depth).eval_ast(ast)

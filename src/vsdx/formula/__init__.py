@@ -48,6 +48,7 @@ from vsdx.formula.context import (
 )
 from vsdx.formula.errors import (
     FormulaCycleError,
+    FormulaDepthError,
     FormulaError,
     FormulaEvaluationError,
     FormulaParseError,
@@ -78,6 +79,7 @@ __all__ = [
     "Evaluator",
     "FUNCTION_NAMES",
     "FormulaCycleError",
+    "FormulaDepthError",
     "FormulaError",
     "FormulaEvaluationError",
     "FormulaParseError",

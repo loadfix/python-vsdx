@@ -47,3 +47,19 @@ class FormulaCycleError(FormulaEvaluationError):
     def __init__(self, message: str, *, cycle: list[str] | None = None):
         super().__init__(message)
         self.cycle = list(cycle) if cycle else []
+
+
+class FormulaDepthError(FormulaError):
+    """Raised when the parser or evaluator exceeds ``max_depth``.
+
+    The ShapeSheet formula grammar permits arbitrarily-nested unary ``-``,
+    right-associative ``^`` chains, and paren/function nesting. CPython's
+    default recursion limit (~1000 frames) is reached well inside crafted
+    inputs (``---...---x`` or ``x^x^x^...^x``) before any semantic error
+    surfaces. A depth cap converts the resulting ``RecursionError`` — which
+    poisons the calling thread — into a structured, catchable error.
+
+    The guard lives on both the parser (``Parser._depth``) and evaluator
+    (``Evaluator._depth``) so either stage can surface the violation
+    without having to walk through the other.
+    """

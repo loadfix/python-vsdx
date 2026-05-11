@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from vsdx.formula.errors import FormulaParseError
+from vsdx.formula.errors import FormulaDepthError, FormulaParseError
 from vsdx.formula.nodes import (
     BinaryOp,
     BoolLiteral,
@@ -52,6 +52,14 @@ _MUL_OPS = {"*", "/"}
 _IMPLICIT_CELL_NAMES = {"Value", "Prompt", "Format", "Invisible", "Verify"}
 
 
+#: Default depth cap for recursive parser descent. Crafted formulas of the
+#: form ``-(-(-(-(...))))`` or ``x^x^x^...^x`` drive :meth:`_parse_unary` /
+#: :meth:`_parse_pow` past CPython's ~1000-frame recursion limit before the
+#: evaluator ever runs; this ceiling turns the resulting ``RecursionError``
+#: into a structured :class:`~vsdx.formula.errors.FormulaDepthError`.
+DEFAULT_MAX_DEPTH = 256
+
+
 class Parser:
     """Recursive-descent Pratt parser over a flat token list.
 
@@ -59,10 +67,39 @@ class Parser:
     module-level :func:`parse` convenience for one-shot parsing.
     """
 
-    def __init__(self, tokens: list[Token], source: str = ""):
+    def __init__(
+        self,
+        tokens: list[Token],
+        source: str = "",
+        max_depth: int = DEFAULT_MAX_DEPTH,
+    ):
         self._tokens = tokens
         self._pos = 0
         self._source = source
+        self._max_depth = max_depth
+        self._depth = 0
+
+    # ------------------------------------------------------------------ depth guard
+
+    def _enter(self) -> None:
+        """Increment the recursion counter; raise when the cap is exceeded.
+
+        Called at the head of every recursive descent method that can nest
+        without consuming a token (``_parse_unary``, ``_parse_pow``,
+        ``_parse_expr``). Paired with :meth:`_leave` in a try/finally so an
+        inner parse error still unwinds the counter cleanly.
+        """
+        self._depth += 1
+        if self._depth > self._max_depth:
+            tok = self._peek()
+            raise FormulaDepthError(
+                f"formula nesting exceeds max_depth={self._max_depth}",
+                source=self._source,
+                position=tok.position,
+            )
+
+    def _leave(self) -> None:
+        self._depth -= 1
 
     # ------------------------------------------------------------------ utilities
 
@@ -102,7 +139,11 @@ class Parser:
         return node
 
     def _parse_expr(self) -> Node:
-        return self._parse_comparison()
+        self._enter()
+        try:
+            return self._parse_comparison()
+        finally:
+            self._leave()
 
     def _parse_comparison(self) -> Node:
         left = self._parse_concat()
@@ -149,22 +190,30 @@ class Parser:
                 return left
 
     def _parse_pow(self) -> Node:
-        left = self._parse_unary()
-        tok = self._peek()
-        if tok.kind is TokenKind.OP and tok.value == "^":
-            self._advance()
-            # Right-associative: recurse to parse the full RHS chain.
-            right = self._parse_pow()
-            return BinaryOp("^", left, right)
-        return left
+        self._enter()
+        try:
+            left = self._parse_unary()
+            tok = self._peek()
+            if tok.kind is TokenKind.OP and tok.value == "^":
+                self._advance()
+                # Right-associative: recurse to parse the full RHS chain.
+                right = self._parse_pow()
+                return BinaryOp("^", left, right)
+            return left
+        finally:
+            self._leave()
 
     def _parse_unary(self) -> Node:
-        tok = self._peek()
-        if tok.kind is TokenKind.OP and tok.value in {"+", "-"}:
-            self._advance()
-            operand = self._parse_unary()
-            return UnaryOp(tok.value, operand)
-        return self._parse_primary()
+        self._enter()
+        try:
+            tok = self._peek()
+            if tok.kind is TokenKind.OP and tok.value in {"+", "-"}:
+                self._advance()
+                operand = self._parse_unary()
+                return UnaryOp(tok.value, operand)
+            return self._parse_primary()
+        finally:
+            self._leave()
 
     def _parse_primary(self) -> Node:
         tok = self._peek()
@@ -330,11 +379,17 @@ class Parser:
         return CellRef(name=name, section=section, row=row, sheet=sheet, source=source_text)
 
 
-def parse(source: str) -> Node:
+def parse(source: str, *, max_depth: int = DEFAULT_MAX_DEPTH) -> Node:
     """Parse ``source`` (a formula string) into an AST.
 
     ``source`` may include a leading ``=`` (Excel-style) which is stripped
     for compatibility with ``dave-howard/vsdx`` output.
+
+    ``max_depth`` bounds recursive descent to guard against crafted
+    deeply-nested inputs (``-(-(-...)))`` or ``x^x^x^...``). On exceed,
+    :class:`~vsdx.formula.errors.FormulaDepthError` is raised. Default
+    256 accommodates every real Visio formula observed in the corpus
+    with a wide margin.
     """
     if not isinstance(source, str):
         raise FormulaParseError("formula source must be a string")
@@ -342,5 +397,5 @@ def parse(source: str) -> Node:
     if text.startswith("="):
         text = text[1:].lstrip()
     tokens = tokenize(text)
-    parser = Parser(tokens, source=text)
+    parser = Parser(tokens, source=text, max_depth=max_depth)
     return parser.parse()
