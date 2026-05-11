@@ -46,11 +46,54 @@ binding(...)``) is **deferred** to a later release.
 
 from __future__ import annotations
 
+import logging
+import re
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, cast
 
 from lxml import etree
 
 from vsdx.constants import CT_VSDX_DATARECORDSETS, NS_VSDX_CORE
+
+_logger = logging.getLogger(__name__)
+
+
+#: Tokens in an ADO / OLEDB / ODBC connection string whose *values* are
+#: credentials or user-identifying handles. Matched case-insensitively
+#: on the token name; the value (everything until the next ``;`` or end
+#: of string) is replaced with ``<REDACTED>``.
+#:
+#: ``User ID`` is the OLEDB spelling (with internal space), ``UID`` the
+#: ODBC spelling; ``Password`` / ``PWD`` likewise. Other credential-
+#: adjacent tokens (``AccessToken``, ``Trusted_Connection``) are left
+#: alone — Trusted_Connection carries no secret, and AccessToken is rare
+#: enough in Visio-authored strings that we err on the side of schema
+#: fidelity. If demand surfaces, extend this tuple.
+_CREDENTIAL_TOKENS = ("Password", "PWD", "User ID", "UID")
+
+_CREDENTIAL_RE = re.compile(
+    r"(?i)(?P<key>" + "|".join(re.escape(t) for t in _CREDENTIAL_TOKENS) + r")"
+    r"\s*=\s*[^;]*",
+)
+
+
+def _redact_connection_string(conn: str) -> str:
+    """Return *conn* with every credential token's value replaced.
+
+    Matches case-insensitively on the token name, preserves everything
+    the user didn't configure (server, database, provider), and emits
+    ``<key>=<REDACTED>`` for each sensitive token. Idempotent.
+    """
+    def _replace(match: re.Match[str]) -> str:
+        return f"{match.group('key')}=<REDACTED>"
+
+    return _CREDENTIAL_RE.sub(_replace, conn)
+
+
+def _connection_has_credentials(conn: Optional[str]) -> bool:
+    """Return True when *conn* contains any credential token."""
+    if not conn:
+        return False
+    return _CREDENTIAL_RE.search(conn) is not None
 
 if TYPE_CHECKING:
     from ooxml_opc import Part
@@ -252,6 +295,10 @@ class DataRecordset:
         self._element = element
         self._part = part
         self._collection = collection
+        # One-shot latch so the "you just pulled a credentialed connection
+        # string out of a DataRecordset" log emission fires at most once
+        # per proxy instance. Keeps log volume sane under batch workloads.
+        self._credentials_access_warned = False
 
     # -- identity -------------------------------------------------------
 
@@ -298,11 +345,58 @@ class DataRecordset:
         it is **never** included in this proxy's :meth:`__repr__`, in
         any exception message raised from this module, or in any log
         emission. Callers that surface it to UIs should apply their own
-        redaction.
+        redaction — :attr:`redacted_connection_string` does this for you.
 
         Read from the root's ``@ADOConnection`` attribute.
+
+        Emits a one-shot ``DeprecationWarning``-style log message on the
+        first access per :class:`DataRecordset` instance when the stored
+        connection string contains credential tokens
+        (``Password``/``PWD``/``User ID``/``UID``). The message never
+        echoes the raw string — it only names the owning part. Use
+        :attr:`redacted_connection_string` for logging or UI surfacing.
         """
-        return self._element.get("ADOConnection")
+        raw = self._element.get("ADOConnection")
+        if (
+            not self._credentials_access_warned
+            and _connection_has_credentials(raw)
+        ):
+            self._credentials_access_warned = True
+            part_name = (
+                self._part.partname if self._part is not None else "<synthetic>"
+            )
+            _logger.warning(
+                "DataRecordset.ado_connection_string accessed on %s: the "
+                "returned value contains credential tokens. Prefer "
+                "DataRecordset.redacted_connection_string for logging or "
+                "UI surfacing. This warning emits once per instance.",
+                part_name,
+            )
+        return raw
+
+    @property
+    def redacted_connection_string(self) -> Optional[str]:
+        """The ADO connection string with credential values redacted.
+
+        Returns ``None`` when the recordset carries no ``@ADOConnection``
+        attribute. Otherwise returns the raw string with every
+        credential token's value replaced by ``<REDACTED>`` — the token
+        name is preserved so the shape of the connection string stays
+        recognisable in logs.
+
+        The matched tokens are, case-insensitively, ``Password``,
+        ``PWD``, ``User ID``, and ``UID``. Other fields (``Server``,
+        ``Database``, ``Provider``, ``Initial Catalog``) are left
+        untouched — they are routinely required for triaging connection
+        failures and do not carry secrets on their own.
+
+        Safe for ``logger.info("rs=%r", recordset.redacted_connection_string)``
+        on user-uploaded drawings.
+        """
+        raw = self._element.get("ADOConnection")
+        if raw is None:
+            return None
+        return _redact_connection_string(raw)
 
     @property
     def commands(self) -> List[str]:

@@ -258,6 +258,86 @@ class DescribeDataRecordsetSecurity:
             assert "Laptop" not in rendered
             assert "NotARealSecret" not in rendered
 
+    def it_redacts_password_in_redacted_connection_string(self) -> None:
+        element = parse_xml(
+            _recordset_xml(
+                connection="Provider=SQLOLEDB;Server=db;Password=secret;"
+            )
+        )
+        rs = DataRecordset(element)
+        redacted = rs.redacted_connection_string
+        assert redacted is not None
+        assert "secret" not in redacted
+        assert "Password=<REDACTED>" in redacted
+        # Non-secret fields stay — operators still need them for
+        # troubleshooting connection failures.
+        assert "Provider=SQLOLEDB" in redacted
+        assert "Server=db" in redacted
+
+    def it_redacts_every_credential_token_case_insensitively(self) -> None:
+        element = parse_xml(
+            _recordset_xml(
+                connection=(
+                    "Server=db;password=A;PWD=B;User ID=alice;uid=bob;"
+                    "PassWord=C"
+                )
+            )
+        )
+        rs = DataRecordset(element)
+        redacted = rs.redacted_connection_string
+        assert redacted is not None
+        for leaked in ("password=A", "PWD=B", "alice", "bob", "PassWord=C"):
+            assert leaked not in redacted
+        # Token names preserved (case preserved), values replaced.
+        for token in ("password", "PWD", "User ID", "uid", "PassWord"):
+            assert f"{token}=<REDACTED>" in redacted
+
+    def it_returns_none_when_no_connection_string_present(self) -> None:
+        element = parse_xml(_recordset_xml(connection=""))
+        # ``connection=""`` still emits ADOConnection="" so we get a
+        # real (but empty) string — redaction on that is a no-op.
+        rs = DataRecordset(element)
+        assert rs.redacted_connection_string == ""
+
+    def it_warns_once_on_raw_ado_connection_access_for_credentialed_rs(
+        self, caplog
+    ) -> None:
+        import logging
+
+        element = parse_xml(_recordset_xml(connection=_SENSITIVE_CONNSTR))
+        rs = DataRecordset(element)
+        with caplog.at_level(logging.WARNING, logger="vsdx.data_recordsets"):
+            _ = rs.ado_connection_string
+            _ = rs.ado_connection_string
+            _ = rs.ado_connection_string
+        credential_warnings = [
+            r for r in caplog.records
+            if "credential tokens" in r.getMessage()
+        ]
+        assert len(credential_warnings) == 1
+        # And the warning itself must never echo the raw string.
+        msg = credential_warnings[0].getMessage()
+        assert "NotARealSecret" not in msg
+        assert "svc_reader" not in msg
+
+    def it_does_not_warn_for_a_recordset_without_credentials(
+        self, caplog
+    ) -> None:
+        import logging
+
+        element = parse_xml(
+            _recordset_xml(connection="Provider=SQLOLEDB;Server=db;")
+        )
+        rs = DataRecordset(element)
+        with caplog.at_level(logging.WARNING, logger="vsdx.data_recordsets"):
+            _ = rs.ado_connection_string
+            _ = rs.ado_connection_string
+        credential_warnings = [
+            r for r in caplog.records
+            if "credential tokens" in r.getMessage()
+        ]
+        assert credential_warnings == []
+
 
 # ---------------------------------------------------------------------------
 # DataRecordsets collection — walks the package's data-recordset parts.
