@@ -383,19 +383,59 @@ class VisioDocument(PartElementProxy):
 _OLE_CFB_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
 
+#: Hard input-size ceiling for ``VisioDocument.open``. Visio desktop tops
+#: out well below this for real drawings; an attacker-supplied multi-GB
+#: blob otherwise forces an unbounded ``source.read()`` into a
+#: :class:`~io.BytesIO` allocation before any zip header is sniffed. 512
+#: MiB is generous enough that legitimate enterprise drawings with large
+#: embedded raster data still open, yet tight enough to fail closed on
+#: pathological inputs without resorting to streaming zip decoders.
+MAX_VSDX_BYTES = 512 * 1024 * 1024
+
+
+class OoxmlVsdxError(ValueError):
+    """Raised by ``python-vsdx`` on malformed or policy-rejected input.
+
+    Inherits from :class:`ValueError` for symmetry with the other
+    python-ooxml parent libraries' exception hierarchies. Callers that
+    want to catch every "unacceptable input" signal may continue to use
+    :class:`ValueError`.
+
+    Currently surfaced when the input stream exceeds
+    :data:`MAX_VSDX_BYTES`. Other policy rejections will reuse this
+    class as they land.
+    """
+
+
 def _coerce_to_stream(source: Union[str, IO[bytes]]) -> IO[bytes]:
-    """Return a seekable binary stream for *source* (path or file-like)."""
+    """Return a seekable binary stream for *source* (path or file-like).
+
+    Reads are capped at :data:`MAX_VSDX_BYTES`. A source that yields more
+    bytes than the cap raises :class:`OoxmlVsdxError` without returning
+    a stream (so callers never see the oversize buffer).
+    """
+    cap = MAX_VSDX_BYTES
     if isinstance(source, str):
         with open(source, "rb") as fh:
-            return io.BytesIO(fh.read())
+            data = fh.read(cap + 1)
+        if len(data) > cap:
+            raise OoxmlVsdxError(
+                "Input file exceeds %d-byte cap; refusing to load."
+                % cap
+            )
+        return io.BytesIO(data)
     # -- file-like: ensure we can peek without consuming the caller's stream --
     pos = source.tell() if hasattr(source, "tell") else 0
-    data = source.read()
+    data = source.read(cap + 1)
     # -- rewind caller's stream when possible so they can reuse it --
     try:
         source.seek(pos)
     except (OSError, AttributeError):
         pass
+    if len(data) > cap:
+        raise OoxmlVsdxError(
+            "Input stream exceeds %d-byte cap; refusing to load." % cap
+        )
     return io.BytesIO(data)
 
 
@@ -405,6 +445,10 @@ def _looks_like_encrypted(stream: IO[bytes]) -> bool:
     The password-protected OOXML family (docx/pptx/xlsx/vsdx) wraps the
     inner zip in an OLE2 compound-document container; the container
     magic is a stable 8-byte prefix independent of the algorithm.
+
+    Only reads the fixed 8-byte magic — the :data:`MAX_VSDX_BYTES` cap
+    is enforced upstream in :func:`_coerce_to_stream`, so by the time
+    this helper runs the stream is already size-bounded.
     """
     stream.seek(0)
     head = stream.read(len(_OLE_CFB_MAGIC))
@@ -425,4 +469,9 @@ class EncryptedPackageError(ValueError):
     """
 
 
-__all__ = ["EncryptedPackageError", "VisioDocument"]
+__all__ = [
+    "EncryptedPackageError",
+    "MAX_VSDX_BYTES",
+    "OoxmlVsdxError",
+    "VisioDocument",
+]
