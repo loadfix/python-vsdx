@@ -103,7 +103,14 @@ from vsdx.shapes import (
     Triangle,
 )
 from vsdx.text import Paragraph, Run, TextFrame
-from vsdx.theme import ColorScheme, FontScheme, Theme
+from vsdx.theme import (
+    ColorScheme,
+    EffectVariant,
+    FontScheme,
+    FontVariation,
+    ShadowParams,
+    Theme,
+)
 from vsdx.util import Cm, Emu, Inches, Length, Mm, Pt
 
 __version__ = "0.2.1.dev0"
@@ -135,11 +142,13 @@ __all__ = [
     "DataRecordset",
     "DataRecordsets",
     "DataRow",
+    "EffectVariant",
     "Ellipse",
     "EllipticalArcTo",
     "Emu",
     "EncryptedPackageError",
     "FontScheme",
+    "FontVariation",
     "Geometries",
     "Geometry",
     "GeometryRow",
@@ -188,6 +197,7 @@ __all__ = [
     "RT_VISIO_WINDOWS",
     "Rectangle",
     "Run",
+    "ShadowParams",
     "Shape",
     "ShapeData",
     "ShapeDataField",

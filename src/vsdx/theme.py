@@ -23,7 +23,8 @@ stays stable across that migration.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from vsdx.parts.theme import ThemePart
 
@@ -31,7 +32,14 @@ if TYPE_CHECKING:
     pass
 
 
-__all__ = ["ColorScheme", "FontScheme", "Theme"]
+__all__ = [
+    "ColorScheme",
+    "EffectVariant",
+    "FontScheme",
+    "FontVariation",
+    "ShadowParams",
+    "Theme",
+]
 
 
 _NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -120,6 +128,91 @@ class Theme:
         if fs is None:
             return None
         return FontScheme(self._theme_part, fs)
+
+    @property
+    def effect_variants(self) -> "List[EffectVariant]":
+        """Ordered list of the theme's three effect variants.
+
+        Returns one :class:`EffectVariant` per ``a:effectStyle`` child of
+        ``a:themeElements/a:fmtScheme/a:effectStyleLst``, capped at the
+        first three entries. The DrawingML spec defines three variants
+        (subtle, moderate, intense); Visio ships six in-use style
+        elements but the authoring surface only exposes the canonical
+        three that :meth:`Page.set_effect_variant` can address.
+
+        Returns ``[]`` when the theme has no ``a:fmtScheme`` /
+        ``a:effectStyleLst`` / any ``a:effectStyle`` children — bare
+        themes authored from scratch fall into this bucket.
+
+        Variant ``preset_num`` values are the 1-based position of the
+        corresponding ``a:effectStyle`` in the list (``1``, ``2``,
+        ``3``); :meth:`Page.set_effect_variant` accepts the 0-based
+        index into :attr:`effect_variants` directly, so callers rarely
+        need to read ``preset_num`` explicitly.
+
+        .. versionadded:: 0.4.0
+        """
+        fmt_scheme = self._fmt_scheme()
+        if fmt_scheme is None:
+            return []
+        effect_style_lst = fmt_scheme.find(_qn("a:effectStyleLst"))
+        if effect_style_lst is None:
+            return []
+        styles = effect_style_lst.findall(_qn("a:effectStyle"))[:3]
+        preset_names = ("subtle", "moderate", "intense")
+        return [
+            EffectVariant(
+                name=preset_names[idx],
+                preset_num=idx + 1,
+                _element=style,
+            )
+            for idx, style in enumerate(styles)
+        ]
+
+    @property
+    def font_variations(self) -> "List[FontVariation]":
+        """Ordered list of ``a:fontVariations/a:fontVariation`` entries.
+
+        Some DrawingML themes (notably pandemic-era Office builds and
+        Microsoft 365 themes) include an ``a:fontVariations`` child of
+        ``a:themeElements`` declaring alternate typeface pairings. Each
+        entry is exposed as a :class:`FontVariation` carrying the
+        variation's ``@name`` plus its major / minor latin typefaces.
+
+        Returns ``[]`` when the theme has no ``a:fontVariations`` child
+        (the common case — Visio's default theme uses a
+        ``vt:fontStylesGroup`` extension element instead).
+
+        .. versionadded:: 0.4.0
+        """
+        theme = self._theme_part.theme_element
+        elements = theme.find(_qn("a:themeElements"))
+        if elements is None:
+            return []
+        variations = elements.find(_qn("a:fontVariations"))
+        if variations is None:
+            return []
+        out: "List[FontVariation]" = []
+        for fv in variations.findall(_qn("a:fontVariation")):
+            major_latin = _find_latin_typeface(fv, "a:majorFont")
+            minor_latin = _find_latin_typeface(fv, "a:minorFont")
+            name = fv.get("name")
+            out.append(
+                FontVariation(
+                    name=None if name is None else str(name),
+                    major_latin_typeface=major_latin,
+                    minor_latin_typeface=minor_latin,
+                )
+            )
+        return out
+
+    def _fmt_scheme(self) -> Optional[Any]:
+        """Return the ``<a:fmtScheme>`` element, or ``None`` if absent."""
+        theme = self._theme_part.theme_element
+        elements = theme.find(_qn("a:themeElements"))
+        if elements is None:
+            return None
+        return elements.find(_qn("a:fmtScheme"))
 
     @property
     def color_scheme_name(self) -> Optional[str]:
@@ -487,3 +580,154 @@ class FontScheme:
         if mf is None:
             return None
         return _ThemeFont(mf)
+
+
+# -- effect variants + font variations ----------------------------------
+
+
+@dataclass(frozen=True)
+class ShadowParams:
+    """Typed view of an ``a:outerShdw`` / ``a:innerShdw`` element.
+
+    Fields mirror the DrawingML attributes:
+
+    - :attr:`blur_rad` — ``@blurRad`` in EMUs (92 900 per inch), or
+      ``None`` when the attribute is omitted.
+    - :attr:`dist` — ``@dist`` in EMUs.
+    - :attr:`direction` — ``@dir`` in sixty-thousandths of a degree
+      (``0`` means "rightward"; the DrawingML spec measures clockwise
+      from east).
+    - :attr:`color` — six-hex-digit RGB string pulled from a nested
+      ``a:srgbClr@val``; ``None`` when the shadow wraps an
+      ``a:schemeClr`` / ``a:sysClr`` / ``a:prstClr`` that doesn't
+      resolve to a literal.
+
+    All fields are optional — DrawingML allows shadow elements to
+    inherit attributes from their parent style, so a sparsely-populated
+    shadow is schema-valid.
+
+    .. versionadded:: 0.4.0
+    """
+
+    blur_rad: Optional[int] = None
+    dist: Optional[int] = None
+    direction: Optional[int] = None
+    color: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class EffectVariant:
+    """A single variant in ``a:fmtScheme/a:effectStyleLst``.
+
+    Exposed as read-only dataclass entries (``name``, ``preset_num``,
+    plus the underlying element via ``_element``). Typed shadow
+    accessors :attr:`shadow_outer_params` / :attr:`shadow_inner_params`
+    return :class:`ShadowParams` for the first ``a:outerShdw`` /
+    ``a:innerShdw`` descendant, or ``None`` when absent.
+
+    :attr:`name` is the canonical DrawingML preset name — ``"subtle"``,
+    ``"moderate"``, or ``"intense"`` — derived from the variant's
+    1-based position in the effect-style list.
+
+    .. versionadded:: 0.4.0
+    """
+
+    name: str
+    preset_num: int
+    _element: Any = None
+
+    @property
+    def shadow_outer_params(self) -> Optional[ShadowParams]:
+        """Typed view of the first ``a:outerShdw`` descendant.
+
+        Walks the variant's ``a:effectLst`` (and any
+        ``a:effectDag`` wrappers) to find the first outer shadow
+        element and returns a :class:`ShadowParams` snapshot of its
+        ``@blurRad`` / ``@dist`` / ``@dir`` / colour children.
+
+        Returns ``None`` when the variant has no outer shadow.
+        """
+        return _shadow_params(self._element, "a:outerShdw")
+
+    @property
+    def shadow_inner_params(self) -> Optional[ShadowParams]:
+        """Typed view of the first ``a:innerShdw`` descendant.
+
+        Counterpart to :attr:`shadow_outer_params`; returns ``None``
+        when the variant has no inner shadow.
+        """
+        return _shadow_params(self._element, "a:innerShdw")
+
+
+@dataclass(frozen=True)
+class FontVariation:
+    """A single entry in ``a:themeElements/a:fontVariations``.
+
+    :attr:`name` — the variation's ``@name`` attribute, or ``None`` if
+    unset.
+
+    :attr:`major_latin_typeface` / :attr:`minor_latin_typeface` — the
+    ``@typeface`` of the variation's ``a:majorFont/a:latin`` and
+    ``a:minorFont/a:latin`` children; ``None`` when either is missing.
+
+    .. versionadded:: 0.4.0
+    """
+
+    name: Optional[str] = None
+    major_latin_typeface: Optional[str] = None
+    minor_latin_typeface: Optional[str] = None
+
+
+def _find_latin_typeface(parent: Any, font_nsptag: str) -> Optional[str]:
+    """Return ``<parent>/<font_nsptag>/a:latin@typeface`` or ``None``."""
+    font = parent.find(_qn(font_nsptag))
+    if font is None:
+        return None
+    latin = font.find(_qn("a:latin"))
+    if latin is None:
+        return None
+    value = latin.get("typeface")
+    return None if value is None else str(value)
+
+
+def _shadow_params(
+    effect_style: Any, shadow_nsptag: str
+) -> Optional[ShadowParams]:
+    """Return :class:`ShadowParams` for the first `shadow_nsptag` descendant."""
+    if effect_style is None:
+        return None
+    shadow = _first_descendant(effect_style, shadow_nsptag)
+    if shadow is None:
+        return None
+    blur = _int_attr(shadow.get("blurRad"))
+    dist = _int_attr(shadow.get("dist"))
+    direction = _int_attr(shadow.get("dir"))
+    color = None
+    srgb = shadow.find(_qn("a:srgbClr"))
+    if srgb is not None:
+        val = srgb.get("val")
+        if val is not None:
+            color = str(val).upper()
+    return ShadowParams(
+        blur_rad=blur, dist=dist, direction=direction, color=color
+    )
+
+
+def _first_descendant(node: Any, nsptag: str) -> Optional[Any]:
+    """Breadth-first search for a single descendant with tag `nsptag`."""
+    qn = _qn(nsptag)
+    # iter() includes node itself — skip that case.
+    for child in node.iter(qn):
+        if child is not node:
+            return child
+    return None
+
+
+def _int_attr(value: Optional[str]) -> Optional[int]:
+    """Return ``int(value)`` or ``None`` when `value` is ``None``/invalid."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
