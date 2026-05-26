@@ -15,7 +15,7 @@ module adds the proxy-layer authoring surface on top per scoping-doc
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator, List, Sequence
+from typing import TYPE_CHECKING, Iterator, List, Optional, Sequence, Union
 
 from vsdx.enum.cells import ST_Unit
 from vsdx.enum.shapes import VS_SHAPE_TYPE
@@ -28,9 +28,15 @@ from vsdx.shapes.base import (
 
 if TYPE_CHECKING:
     from vsdx.oxml._stubs import CT_Shape  # TODO(vsdx/track-1)
+    from vsdx.shapes.autoshape import _BuiltInAutoShape
     from vsdx.shapes.shapetree import ShapeTree
 
-__all__ = ["GroupShape"]
+__all__ = ["GroupMembers", "GroupShape"]
+
+
+# Coordinate-tuple type for ``at=`` / ``size=`` keyword arguments — kept
+# in sync with :class:`vsdx.shapes.shapetree.PointLike`.
+PointLike = Union["tuple[float, float]", "tuple[int, int]"]
 
 
 # ---------------------------------------------------------------------------
@@ -113,13 +119,136 @@ def _to_page_coords(
 # ---------------------------------------------------------------------------
 
 
+class GroupMembers:
+    """Authoring view over the members of a :class:`GroupShape`.
+
+    The defining feature of a Visio group shape is the nested
+    ``<Shapes>`` child that holds member shapes with **group-local**
+    PinX / PinY coordinates. ``GroupMembers`` exposes that nested
+    container as the ergonomic ``group.shapes`` collection so
+    callers can reach into a group with the same idiom they use on
+    a page::
+
+        group = page.shapes.add_group(at=(1, 1), size=(4, 3))
+        group.shapes.add_shape("Rectangle", at=(0, 0), size=(1, 1))
+        group.shapes.add_shape("Ellipse",   at=(2, 0), size=(1, 1))
+        assert len(group.shapes) == 2
+
+    Coordinates passed to :meth:`add_shape` are **group-local**: ``at``
+    is measured from the group's top-left corner. (Visio desktop
+    serialises member PinX/PinY as group-local on disk; the proxy
+    matches that contract verbatim.)
+
+    Construct indirectly via :attr:`GroupShape.shapes` — callers do
+    not instantiate this class directly.
+
+    .. versionadded:: 0.3.0
+    """
+
+    def __init__(self, group: "GroupShape") -> None:
+        self._group = group
+
+    # -- container ------------------------------------------------------
+
+    def _shapes_el(self):
+        return self._group._element.get_or_add_shapes()
+
+    def __iter__(self) -> Iterator[Shape]:
+        shapes_el = self._group._element.shapes
+        if shapes_el is None:
+            return iter([])
+        tree = self._group._parent
+        return iter(tree._proxy_for(el) for el in shapes_el.shape_lst)
+
+    def __len__(self) -> int:
+        shapes_el = self._group._element.shapes
+        return 0 if shapes_el is None else len(shapes_el.shape_lst)
+
+    def __getitem__(self, idx: int) -> Shape:
+        shapes_el = self._group._element.shapes
+        if shapes_el is None:
+            raise IndexError(idx)
+        tree = self._group._parent
+        return tree._proxy_for(shapes_el.shape_lst[idx])
+
+    # -- authoring ------------------------------------------------------
+
+    def add_shape(
+        self,
+        shape_type,
+        at: PointLike = (0.0, 0.0),
+        size: PointLike = (1.0, 1.0),
+        text: Optional[str] = None,
+    ) -> "_BuiltInAutoShape":
+        """Add a built-in autoshape into this group and return its proxy.
+
+        Mirrors :meth:`vsdx.shapes.shapetree.ShapeTree.add_shape` but
+        appends the new ``<Shape>`` element under this group's nested
+        ``<Shapes>`` instead of the page's top-level ``<Shapes>``. The
+        shape ID is allocated from the owning page so every shape on
+        the page (top-level and inside any group) keeps a unique ``@ID``.
+
+        :param shape_type: Either a :class:`VS_SHAPE_TYPE` member or
+            the raw NameU string of a built-in master.
+        :param at: ``(pin_x, pin_y)`` group-local centre-pin position.
+        :param size: ``(width, height)`` tuple in inches.
+        :param text: optional initial text content.
+
+        .. versionadded:: 0.3.0
+        """
+        # Local imports — these modules import GroupShape transitively.
+        from vsdx.shapes.autoshape import autoshape_cls_for, _BuiltInAutoShape
+
+        name_u = (
+            shape_type.value
+            if isinstance(shape_type, VS_SHAPE_TYPE)
+            else str(shape_type)
+        )
+        nested = self._shapes_el()
+        shape_el = nested.add_shape(master_name_u=name_u)
+
+        # Allocate the shape ID from the owning page — climb the parent
+        # chain (group._parent is the page's ShapeTree, which has a
+        # ``_parent`` Page).
+        page = _resolve_page(self._group)
+        if page is not None:
+            shape_el.shape_id = page.next_shape_id()
+
+        cls = autoshape_cls_for(name_u)
+        proxy: _BuiltInAutoShape = cls(shape_el, self._group._parent)
+        pin_x, pin_y = float(at[0]), float(at[1])
+        w, h = float(size[0]), float(size[1])
+        proxy.set_geometry(pin_x, pin_y, w, h)
+        if text is not None:
+            proxy.text = text
+        return proxy
+
+
+def _resolve_page(group: "GroupShape"):
+    """Walk the parent chain to find the owning :class:`~vsdx.page.Page`.
+
+    A :class:`GroupShape`'s ``_parent`` is a :class:`ShapeTree`
+    (top-level group on a page) or another :class:`GroupShape` (nested
+    group); both expose a ``_parent`` that ultimately reaches a
+    :class:`~vsdx.page.Page`.
+    """
+    from vsdx.page import Page
+
+    node = group._parent
+    while node is not None and not isinstance(node, Page):
+        node = getattr(node, "_parent", None)
+    return node
+
+
 class GroupShape(TextShape):
     """A user-authored group shape.
 
     Inherits from :class:`~vsdx.shapes.base.TextShape` so groups can
     carry optional group-level text (rare but legal per MS Learn).
     The defining feature is the nested ``<Shapes>`` child — iterate
-    :attr:`member_shapes` to walk the group contents.
+    :attr:`member_shapes` (legacy 0.2.0 surface) or use the
+    :attr:`shapes` collection (0.3.0 ergonomic spelling) to walk and
+    author group contents.
 
     .. versionadded:: 0.2.0
     """
@@ -134,7 +263,7 @@ class GroupShape(TextShape):
         """The shapes inside this group, each wrapped in a proxy.
 
         Returns an empty list when the group is freshly created; the
-        list updates as :meth:`add_member` / :meth:`ungroup` run.
+        list updates as :meth:`shapes` mutators / :meth:`ungroup` run.
 
         .. versionadded:: 0.2.0
         """
@@ -146,6 +275,20 @@ class GroupShape(TextShape):
         # shapes inside a group.
         tree = self._parent
         return [tree._proxy_for(el) for el in shapes_el.shape_lst]
+
+    @property
+    def shapes(self) -> "GroupMembers":
+        """The group's nested-shape authoring collection.
+
+        Returns a :class:`GroupMembers` view that supports
+        ``add_shape``, iteration, ``len(...)``, and indexed access —
+        the same idiom as :attr:`vsdx.page.Page.shapes` on a top-level
+        page tree, but appending into the group's nested ``<Shapes>``
+        with **group-local** member coordinates.
+
+        .. versionadded:: 0.3.0
+        """
+        return GroupMembers(self)
 
     def __iter__(self) -> Iterator[Shape]:
         return iter(self.member_shapes)

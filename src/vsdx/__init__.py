@@ -96,6 +96,7 @@ from vsdx.shape_data import (
 from vsdx.shapes import (
     Connector,
     Ellipse,
+    GroupMembers,
     GroupShape,
     Rectangle,
     Shape,
@@ -152,6 +153,7 @@ __all__ = [
     "Geometries",
     "Geometry",
     "GeometryRow",
+    "GroupMembers",
     "GroupShape",
     "Hyperlink",
     "HyperlinkCollection",
