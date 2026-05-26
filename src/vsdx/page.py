@@ -316,6 +316,21 @@ class Page(PartElementProxy):
         """Allocate a fresh ``@ID`` for a new shape on this page."""
         return self._page_part.allocate_shape_id()
 
+    # -- ShapeSheet formula recomputation -------------------------------
+
+    def recompute(self) -> int:
+        """Re-evaluate every cell with a formula on every shape on this page.
+
+        Iterates the page's :class:`ShapeTree` and calls
+        :meth:`vsdx.shapes.base.Shape.recompute` on each shape; nested
+        group-shape children are walked recursively. Returns the total
+        number of cells whose ``@V`` actually changed across the page.
+
+        .. versionadded:: 0.3.0
+        """
+
+        return _recompute_shape_tree(self.shapes)
+
     # -- high-level connector authoring --------------------------------
 
     def connect(
@@ -996,6 +1011,37 @@ def _nearest_connection_point(
             best_d2 = d2
             best = point
     return best
+
+
+def _recompute_shape_tree(shape_tree) -> int:
+    """Walk *shape_tree* recursively, summing ``recompute`` change counts.
+
+    Module-level helper because :class:`Page` and :class:`VisioDocument`
+    both delegate the work to a shape iterator. Nested group-shape
+    children carry their own ``<Cell>`` grids and are reachable via
+    :attr:`Shape.shapes` on the group; we descend into those too.
+    """
+
+    total = 0
+    for shape in shape_tree:
+        total += shape.recompute()
+        # Group shapes carry nested children — descend so their cells
+        # are recomputed too. ``getattr`` keeps this safe for the
+        # (most common) leaf-shape case where ``shapes`` is absent.
+        nested_el = getattr(shape._element, "shapes", None)
+        if nested_el is None:
+            continue
+        # Build a lightweight iterator over the nested shape tree by
+        # constructing transient :class:`Shape` proxies. We deliberately
+        # don't use the ``GroupShape.children`` API to avoid an import
+        # cycle; the proxy is only needed for its ``recompute()`` and
+        # ``_element`` attributes, which the base class supplies.
+        from vsdx.shapes.base import Shape as _Shape
+
+        for nested_el2 in nested_el.shape_lst:
+            nested_shape = _Shape(nested_el2, shape_tree)
+            total += nested_shape.recompute()
+    return total
 
 
 __all__ = ["Page", "Pages"]

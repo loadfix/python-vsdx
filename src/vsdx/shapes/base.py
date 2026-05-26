@@ -21,6 +21,7 @@ from vsdx.text import TextFrame
 from vsdx.util import Inches, Length
 
 if TYPE_CHECKING:
+    from vsdx.cell import Cell as Cell_
     from vsdx.connection_points import ConnectionPoints
     from vsdx.geometry import Geometries, Geometry
     from vsdx.hyperlinks import HyperlinkCollection
@@ -74,6 +75,76 @@ def _fmt_num(v: float) -> str:
     if v == int(v):
         return str(int(v))
     return ("%f" % v).rstrip("0").rstrip(".")
+
+
+# Recursion / safety bounds for :meth:`Shape.recompute`. The cap is
+# deliberately generous so real Visio-authored shapes never trip it;
+# it's a defence-in-depth guard against pathological self-referential
+# formulas that would otherwise drive the evaluator into a stack
+# overflow before the formula-package's own depth check fires.
+_RECOMPUTE_MAX_FORMULA_LEN = 32_768
+
+
+def _evaluate_with_safety(formula: str, ctx) -> object:
+    """Evaluate *formula* against *ctx*, capping the input length first.
+
+    The formula package already enforces parser/evaluator depth, but a
+    32 KB ceiling on the source string is a cheap extra guard against
+    a maliciously-large blob from a hand-edited package.
+    """
+
+    if len(formula) > _RECOMPUTE_MAX_FORMULA_LEN:
+        from vsdx.formula.errors import FormulaParseError
+
+        raise FormulaParseError(
+            f"formula source exceeds {_RECOMPUTE_MAX_FORMULA_LEN}-char cap"
+        )
+    from vsdx.formula.evaluator import evaluate as _evaluate
+
+    return _evaluate(formula, ctx)
+
+
+def _format_recompute_value(value: object) -> str:
+    """Stringify a recomputed value the way Visio writes ``@V``.
+
+    Booleans are emitted as ``"TRUE"``/``"FALSE"`` (Visio's spelling),
+    floats use the trim-trailing-zero pattern shared with
+    :func:`_fmt_num`, and PNT-tuples flatten back to the
+    ``PNT(x, y)`` source form (callers writing back to ``@V`` of a
+    point-valued cell would otherwise lose the structure).
+    """
+
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, (int,)) and not isinstance(value, bool):
+        return str(value)
+    if isinstance(value, float):
+        return _fmt_num(value)
+    if isinstance(value, tuple):
+        return "PNT(" + ", ".join(_format_recompute_value(v) for v in value) + ")"
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _iter_all_cells(shape_el):
+    """Yield every ``<Cell>`` descendant of *shape_el* in document order.
+
+    Includes singleton cells on the shape itself, every cell on every
+    row of every section, and any direct cell-children of sections
+    (rare; mostly for Layer sections).
+    """
+
+    # Singleton cells.
+    for cell in shape_el.cell_lst:
+        yield cell
+    # Section cells (direct + row-nested).
+    for section in shape_el.section_lst:
+        for cell in section.cell_lst:
+            yield cell
+        for row in section.row_lst:
+            for cell in row.cell_lst:
+                yield cell
 
 
 class Shape(ParentedElementProxy):
@@ -755,6 +826,85 @@ class Shape(ParentedElementProxy):
             if mtext:
                 return mtext
         return ""
+
+    # -- ShapeSheet formula recomputation --------------------------------
+
+    def cell(self, name: str) -> Optional["Cell_"]:
+        """Return the :class:`~vsdx.cell.Cell` proxy for ``<Cell N=name>``.
+
+        Returns ``None`` when the named cell is absent on the instance
+        (does not consult the master chain — callers that need the
+        effective value should use :meth:`effective_prop` instead).
+        Wraps the same ``CT_Cell`` element that the typed accessors
+        (:attr:`pin_x`, :attr:`width`, ...) read; mutations through
+        the returned :class:`Cell` proxy are visible on subsequent
+        reads.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.cell import Cell as _Cell
+
+        raw = self._get_cell(name)
+        if raw is None:
+            return None
+        return _Cell(raw)
+
+    def recompute(self, *, only_with_formula: bool = True) -> int:
+        """Re-evaluate every cell on this shape and update ``@V``.
+
+        Walks every ``<Cell>`` (singleton + sections + rows) and, for
+        each cell that carries a non-empty ``@F``, evaluates the
+        formula against a live :class:`ShapeContext` rooted at this
+        shape, writing the stringified result back to ``@V``. Returns
+        the number of cells whose ``@V`` actually changed.
+
+        Cells without a formula are left untouched. Formulas that fail
+        to evaluate (unresolved cell, divide-by-zero, etc.) are caught
+        and recorded on the cell's ``@E`` attribute (Visio's error
+        sentinel) so the recompute pass remains idempotent on
+        partially-broken shapes.
+
+        Pass ``only_with_formula=False`` to *also* clear stale ``@E``
+        markers on cells without ``@F`` (rare; defaults to ``True``
+        which is the cheaper / more common case).
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.formula.errors import FormulaError
+        from vsdx.formula.integration import for_shape as _for_shape
+
+        ctx = _for_shape(self._element)
+        changed = 0
+        # Walk every <Cell> in document order — singletons on the
+        # shape, then every cell in every row of every section. We
+        # use a single context so cross-cell references on the same
+        # shape resolve consistently within a pass.
+        for cell_el in _iter_all_cells(self._element):
+            f = cell_el.get("F")
+            if f is None or f == "":
+                if not only_with_formula and cell_el.get("E"):
+                    cell_el.attrib.pop("E", None)
+                    changed += 1
+                continue
+            try:
+                value = _evaluate_with_safety(f, ctx)
+            except FormulaError as exc:
+                # Mirror Visio's behaviour: stamp ``@E`` and leave ``@V``
+                # alone so downstream consumers can detect the failure
+                # without losing the previous (possibly cached) value.
+                marker = f"#ERR: {exc.__class__.__name__}"
+                if cell_el.get("E") != marker:
+                    cell_el.set("E", marker)
+                    changed += 1
+                continue
+            new_text = _format_recompute_value(value)
+            if cell_el.get("V") != new_text:
+                cell_el.set("V", new_text)
+                changed += 1
+            # Successful recompute clears any previous error stamp.
+            if cell_el.get("E") is not None:
+                cell_el.attrib.pop("E", None)
+        return changed
 
     # -- helpers --------------------------------------------------------
 

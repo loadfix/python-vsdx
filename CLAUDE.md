@@ -59,8 +59,13 @@ analysis.
 - **ChartEx**, **ChartShape**, **DataGraphics** — all 0.3.0.
 - **`.vsdm` / `.vssx` / `.vssm` / `.vstx` / `.vstm`** —
   content-type variants over the same schema; 0.2.0+.
-- **ShapeSheet formula evaluator** — `Cell/@F` is always
-  pass-through; Visio desktop recomputes on open.
+- **ShapeSheet formula evaluator** — landed 0.3.0. The
+  `vsdx.formula` package ships a hand-rolled lexer, Pratt parser,
+  AST walker, and dependency graph plus ~67 Visio builtins. Drive
+  via `Shape.recompute()` / `Page.recompute()` / `doc.recompute()`,
+  or evaluate ad hoc with `vsdx.formula.evaluate(formula,
+  Context.for_shape(shape))`. See
+  `src/vsdx/formula/COVERAGE.md` for the function vocabulary.
 - **Layers, groups (beyond autoshape default), background pages** —
   0.2.0.
 - **Digital signatures, encryption, ink** — 0.3.0+.

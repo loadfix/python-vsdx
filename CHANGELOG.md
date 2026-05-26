@@ -54,6 +54,27 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   shape tree so the destination is self-contained. Re-using the
   same master for multiple instances does not duplicate the import.
 
+### Added — ShapeSheet formula evaluator integration (vsdx-maturity-formula)
+
+- **`Shape.recompute()`** / **`Page.recompute()`** /
+  **`VisioDocument.recompute()`** — walk every cell with a non-empty
+  ``@F``, evaluate against a live :class:`ShapeContext` rooted on the
+  shape, and write the stringified result back to ``@V``. Returns the
+  number of cells whose value actually changed; failures stamp
+  ``@E`` rather than poisoning the rest of the pass.
+- **`Shape.cell(name)`** — returns a :class:`vsdx.cell.Cell` proxy for
+  a singleton ``<Cell>`` child, exposing typed
+  ``name``/``value``/``formula``/``unit`` accessors plus
+  ``evaluate(context=None)`` / ``recompute(context=None)``.
+- **`vsdx.formula.Context.for_shape(shape)`** — build a live resolver
+  that walks the owning shape's oxml tree (singletons, sections,
+  rows) and the page's sibling shapes for ``Sheet.N!`` / ``Name!``
+  cross-shape refs. ``Context.for_mapping(...)`` is the existing
+  unit-test path.
+- **`CONCAT`** alias of ``CONCATENATE`` (Visio 2013+ spelling).
+- Coverage doc at ``src/vsdx/formula/COVERAGE.md`` listing every
+  supported operator and builtin with edge-case notes.
+
 ### Added — stencil builder API (R16-2)
 
 - **`vsdx.Stencil`** is now a class with authoring-first classmethods
