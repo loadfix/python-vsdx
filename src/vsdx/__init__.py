@@ -77,7 +77,7 @@ from vsdx.geometry import (
     SplineStart,
     UnknownGeometryRow,
 )
-from vsdx.layers import Layer, Layers
+from vsdx.layers import Layer, Layers, ShapeLayers
 from vsdx.master import Master, Masters
 from vsdx.page import Page, Pages
 from vsdx.print_setup import PRINT_ORIENTATION, PrintSetup
@@ -201,6 +201,7 @@ __all__ = [
     "Shape",
     "ShapeData",
     "ShapeDataField",
+    "ShapeLayers",
     "ShapeTree",
     "SplineKnot",
     "SplineStart",

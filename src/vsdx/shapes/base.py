@@ -243,34 +243,27 @@ class Shape(ParentedElementProxy):
         )
 
     @property
-    def layers(self) -> "list":
-        """The :class:`~vsdx.layers.Layer` proxies this shape belongs to.
+    def layers(self) -> "Any":
+        """Layer-membership view on this shape.
 
-        Reads the shape's ``<Cell N="LayerMember" V="…">`` and resolves
-        each index against the owning page's layer section. Returns an
-        empty list when the shape has no ``LayerMember`` cell.
+        Returns a :class:`~vsdx.layers.ShapeLayers` proxy that supports
+        both the read-only list idiom (``len(shape.layers)``,
+        ``layer in shape.layers``, ``for L in shape.layers``) and the
+        ergonomic ``shape.layers.add(layer)`` / ``shape.layers.remove(layer)``
+        mutators introduced in 0.3.0. Iterating yields
+        :class:`~vsdx.layers.Layer` proxies in the
+        ``<Cell N="LayerMember" V="…">`` declaration order; an empty
+        membership reads as ``len(...) == 0`` and ``bool(...)`` ``False``.
 
         .. versionadded:: 0.2.0
+        .. versionchanged:: 0.3.0
+            Returns :class:`~vsdx.layers.ShapeLayers` instead of a bare
+            ``list``. Backwards-compatible — every read-only pattern that
+            worked on the list still works on the proxy.
         """
-        from vsdx.layers import _shape_layers_proxy
-        from vsdx.page import Page
-        from vsdx.shapes.shapetree import ShapeTree
+        from vsdx.layers import ShapeLayers
 
-        # Walk up to the owning Page proxy. ShapeTree._parent is Page.
-        parent = self._parent
-        if isinstance(parent, ShapeTree):
-            page = parent._parent
-        elif isinstance(parent, Page):
-            page = parent
-        else:
-            # Shapes inside a GroupShape use the group as parent; climb.
-            climbing = parent
-            while climbing is not None and not isinstance(climbing, Page):
-                climbing = getattr(climbing, "_parent", None)
-            page = climbing
-        if page is None:
-            return []
-        return _shape_layers_proxy(self, page)
+        return ShapeLayers(self)
 
     def set_layers(self, layers) -> None:
         """Replace this shape's layer membership with *layers*.
