@@ -90,6 +90,53 @@ class ShapeTree(ParentedElementProxy):
             proxy.text = text
         return proxy
 
+    def add_custom_shape(
+        self,
+        at: PointLike = (0.0, 0.0),
+        size: PointLike = (1.0, 1.0),
+        master: Optional[str] = None,
+    ) -> Shape:
+        """Add a master-less :class:`Shape` with an empty Geometry section.
+
+        The newly minted shape has no ``@Master`` reference (so Visio
+        treats it as user-authored, not a built-in autoshape instance)
+        and one empty ``<Section N="Geometry" IX="0">`` ready for path
+        building. Use the returned shape's :attr:`~vsdx.shapes.base.
+        Shape.geometry` to drop a custom path::
+
+            shape = page.shapes.add_custom_shape(at=(1, 1), size=(3, 2))
+            shape.geometry.move_to(0, 0)
+            shape.geometry.line_to(1, 0)
+            shape.geometry.curve_to(0.5, 0.5, 1.0, 0.5, 1.0, 1.0)
+            shape.geometry.arc_to(0, 1, sweep=0.5)
+            shape.geometry.close()
+
+        :param at: ``(pin_x, pin_y)`` tuple in inches — the shape's
+            centre-pin position.
+        :param size: ``(width, height)`` tuple in inches.
+        :param master: optional NameU of a master to inherit fill /
+            line / text-style defaults from. ``None`` (the default)
+            authors a fully standalone shape with no master link.
+
+        .. versionadded:: 0.3.0
+        """
+        shape_el = self._element.shapes_element.add_shape(
+            master_name_u=master
+        )
+        page = self._parent
+        shape_el.shape_id = page.next_shape_id()
+
+        proxy = TextShape(shape_el, self)
+        pin_x, pin_y = float(at[0]), float(at[1])
+        w, h = float(size[0]), float(size[1])
+        proxy.set_geometry(pin_x, pin_y, w, h)
+        # Pre-install an empty <Section N="Geometry" IX="0"> so callers
+        # can chain .geometry.move_to(...) directly without having to
+        # add_geometry() first. Matches Visio desktop's "Insert Custom
+        # Shape" behaviour: a fresh shape arrives with one empty path.
+        proxy.add_geometry()
+        return proxy
+
     def add_shape_from_master(
         self,
         master_name_u: str,
