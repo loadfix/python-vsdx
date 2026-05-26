@@ -82,6 +82,19 @@ doc = parse_xml(xml)
 assert isinstance(doc, CT_VisioDocument)
 ```
 
+## Round-trip support
+
+Visio's `.vsdx` is also an OPC zip, so the cross-monorepo round-trip
+gate at [`tests/round_trip/`](../tests/round_trip/README.md) covers it
+on the same footing as the other three formats. The
+`round-trip-fidelity` CI job opens each corpus fixture (including
+`vsdx-default`), saves with `reproducible=True`, and asserts an empty
+`Package.diff`.
+
+The per-feature support matrix (what's "fully preserved" / "preserved
+with caveats" / "lossy") lives at
+[`docs/round-trip-fidelity.md`](../docs/round-trip-fidelity.md).
+
 ## Related projects
 
 - [python-docx](https://github.com/loadfix/python-docx)
