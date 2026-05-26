@@ -221,6 +221,25 @@ class VisioDocument(PartElementProxy):
 
         return document_to_svg_all(self, directory)
 
+    # -- ShapeSheet formula recomputation -------------------------------
+
+    def recompute(self) -> int:
+        """Re-evaluate every formula on every shape on every page.
+
+        Convenience wrapper that calls :meth:`Page.recompute` for each
+        page in :attr:`pages` and sums the change counts. Use this
+        before :meth:`save` when you've authored a document with
+        formula cells and need ``@V`` to reflect the formulas without
+        a Visio open / save cycle.
+
+        .. versionadded:: 0.3.0
+        """
+
+        total = 0
+        for page in self.pages:
+            total += page.recompute()
+        return total
+
     # -- convenience ----------------------------------------------------
 
     @property
