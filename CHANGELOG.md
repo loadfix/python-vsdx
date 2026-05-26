@@ -6,6 +6,31 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — custom-geometry authoring entry points (vsdx-maturity-geometry)
+
+- **`Shapes.add_custom_shape(at, size, master=None)`** — drop a
+  master-less :class:`~vsdx.shapes.base.Shape` with one empty
+  ``<Section N="Geometry" IX="0">`` pre-installed, ready for path
+  building via the chainable ``shape.geometry`` accessor. ``master``
+  is optional — pass a master NameU when you want the shape to inherit
+  fill / line / text-style defaults from a known master while still
+  overriding its outline.
+- **`Geometry.curve_to(c1x, c1y, c2x, c2y, ex, ey)`** — append a cubic
+  Bezier (two control points + endpoint) row. Lowers to a Visio
+  :class:`~vsdx.geometry.NURBSTo` row with degree=3 and the canonical
+  cubic-Bezier-as-NURBS knot vector; control points are carried in the
+  ``C`` cell's ``NURBS(...)`` formula.
+- **`Geometry.arc_to(..., sweep=...)`** — the existing ``arc_to`` now
+  accepts a ``sweep`` keyword as an alias for ``bow``. Both names map
+  to the same Visio cell (``A``); pass whichever reads better at the
+  call site. Passing both raises :class:`TypeError`; passing neither
+  defaults the bow to ``0``.
+- **`Geometry.close()`** — append a ``LineTo`` whose endpoint matches
+  the most recent :class:`~vsdx.geometry.MoveTo` in the path. Visio
+  has no dedicated "close path" row; desktop emits exactly this row,
+  and the helper preserves that convention. No-ops (returns ``None``)
+  when the path has no ``MoveTo`` to close back to.
+
 ### Added — stencil builder API (R16-2)
 
 - **`vsdx.Stencil`** is now a class with authoring-first classmethods
