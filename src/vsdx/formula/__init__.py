@@ -56,6 +56,7 @@ from vsdx.formula.errors import (
 )
 from vsdx.formula.evaluator import Evaluator, evaluate
 from vsdx.formula.graph import DependencyGraph
+from vsdx.formula.integration import ShapeContext, for_shape
 from vsdx.formula.nodes import (
     BinaryOp,
     BoolLiteral,
@@ -69,12 +70,53 @@ from vsdx.formula.nodes import (
 from vsdx.formula.parser import Parser, parse
 from vsdx.formula.tokenizer import Token, TokenKind, tokenize
 
+class Context:
+    """Namespace facade over the resolver constructors.
+
+    Exposed for the documented ``Context.for_shape(shape)`` /
+    ``Context.for_mapping(...)`` entry points used in user-facing
+    examples. The class deliberately has no instance state — it just
+    bundles factory classmethods so callers can write
+    ``vsdx.formula.Context.for_shape(s)`` instead of importing the
+    underlying functions.
+
+    .. versionadded:: 0.3.0
+    """
+
+    @staticmethod
+    def for_shape(
+        shape_or_element: object, *, strict: bool = False
+    ) -> ShapeContext:
+        """Build a live :class:`ShapeContext` for *shape_or_element*.
+
+        Equivalent to :func:`vsdx.formula.for_shape`. Accepts either a
+        :class:`~vsdx.shapes.base.Shape` proxy or a bare
+        ``CT_Shape`` oxml element.
+        """
+
+        return for_shape(shape_or_element, strict=strict)
+
+    @staticmethod
+    def for_mapping(
+        cells=None, *, strict: bool = False
+    ) -> MappingShapeSheetContext:
+        """Build a :class:`MappingShapeSheetContext` over an explicit dict.
+
+        Convenience for unit tests and tooling that wants to evaluate
+        formulas without a live shape — pass a dict whose keys are
+        canonical ``CellRef.qualified()`` strings.
+        """
+
+        return MappingShapeSheetContext(cells, strict=strict)
+
+
 __all__ = [
     "BUILTINS",
     "BinaryOp",
     "BoolLiteral",
     "BuiltinFunction",
     "CellRef",
+    "Context",
     "DependencyGraph",
     "Evaluator",
     "FUNCTION_NAMES",
@@ -89,6 +131,7 @@ __all__ = [
     "Node",
     "NumberLiteral",
     "Parser",
+    "ShapeContext",
     "ShapeSheetContext",
     "StringLiteral",
     "Token",
@@ -96,6 +139,7 @@ __all__ = [
     "UnaryOp",
     "cell_ref_to_string",
     "evaluate",
+    "for_shape",
     "parse",
     "parse_cell_ref",
     "register_function",
