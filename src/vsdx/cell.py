@@ -36,12 +36,12 @@ context is supplied.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from vsdx.formula.context import ShapeSheetContext
     from vsdx.formula.nodes import FormulaValue
-    from vsdx.oxml._stubs import CT_Cell  # TODO(vsdx/track-1)
+    from vsdx.oxml._stubs import CT_Cell  # noqa: F401  # TODO(vsdx/track-1)
 
 
 __all__ = ["Cell"]

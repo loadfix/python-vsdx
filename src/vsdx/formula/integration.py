@@ -40,7 +40,12 @@ from vsdx.formula.errors import FormulaEvaluationError
 from vsdx.formula.nodes import CellRef, FormulaValue
 
 if TYPE_CHECKING:
-    from vsdx.oxml._stubs import CT_Cell, CT_Row, CT_Section, CT_Shape
+    from vsdx.oxml._stubs import (  # noqa: F401  # forward-ref types
+        CT_Cell,
+        CT_Row,
+        CT_Section,
+        CT_Shape,
+    )
 
 
 __all__ = ["ShapeContext"]
@@ -236,13 +241,24 @@ def _resolve_local_ref(
     # If the second token (stored in ``ref.name`` for two-part refs
     # without a row, or in ``ref.row`` for three-part refs) looks like
     # a Geometry-style cell name, treat the section ref as
-    # ``section.<row=1>.<cell=name>``. Otherwise treat it as
+    # ``section.<row=N>.<cell=base>``. Otherwise treat it as
     # ``section.<row=name>.Value``.
     if ref.row is None:
         # Two-part: ``Section.Token``.
-        if _GEOMETRY_CELL_NAMES.match(ref.name):
-            # Geometry-style — first row's cell named ref.name.
-            return _row_value(section, row_qualifier=None, cell_name=ref.name)
+        match = _GEOMETRY_CELL_NAMES.match(ref.name)
+        if match is not None:
+            # Geometry-style. Visio's convention is that ``Geometry1.X1``
+            # means "cell X of row 1" — the trailing digits on the
+            # cell name actually identify the row, while the alpha
+            # prefix names the cell within that row.
+            base = match.group(1)
+            trailing = ref.name[len(base):]
+            row_qualifier = trailing if trailing else None
+            return _row_value(
+                section,
+                row_qualifier=row_qualifier,
+                cell_name=base,
+            )
         # Otherwise treat as a row-qualified value cell.
         return _row_value(section, row_qualifier=ref.name, cell_name="Value")
     # Three-part: ``Section.Row.Cell``.
