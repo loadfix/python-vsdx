@@ -656,6 +656,11 @@ def _register_all() -> None:
         ("FORMAT", _fn_format, 1, 2),
         ("FORMATEX", _fn_formatex, 1, -1),
         ("CONCATENATE", _fn_concatenate, 1, -1),
+        # CONCAT — Visio 2013+ alias for CONCATENATE; same semantics as
+        # Excel's CONCAT (no inter-arg separator). Also lets the formula
+        # source ``CONCAT(a, b)`` round-trip without rewriting to the
+        # older spelling.
+        ("CONCAT", _fn_concatenate, 1, -1),
         ("INDEX", _fn_index, 1, -1),
         ("LOOKUP", _fn_lookup, 1, -1),
         ("GUARD", _fn_guard, 1, 1),
