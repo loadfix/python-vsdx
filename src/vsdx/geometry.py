@@ -750,18 +750,145 @@ class Geometry(ParentedElementProxy):
         row = self._append_row("LineTo", [("X", x), ("Y", y)])
         return LineTo(row, self)
 
-    def arc_to(self, x: float, y: float, bow: float) -> ArcTo:
+    def arc_to(
+        self,
+        x: float,
+        y: float,
+        bow: Optional[float] = None,
+        *,
+        sweep: Optional[float] = None,
+    ) -> ArcTo:
         """Append an ``ArcTo`` row and return the row proxy.
 
         *bow* is the perpendicular distance from the chord midpoint to
-        the arc (positive bows left of the travel direction).
+        the arc (positive bows left of the travel direction). The
+        ``sweep`` keyword is accepted as an alias for *bow* — both
+        names refer to the same Visio cell (``A``); pass whichever
+        reads better at the call site::
+
+            geo.arc_to(1, 0, 0.25)           # positional bow
+            geo.arc_to(1, 0, bow=0.25)       # keyword bow
+            geo.arc_to(0, 1, sweep=0.5)      # keyword sweep alias
+
+        Passing both ``bow`` and ``sweep`` raises :class:`TypeError`;
+        passing neither defaults to ``0`` (a degenerate straight line —
+        Visio tolerates it as the chord, but callers usually want a
+        non-zero arc height).
 
         .. versionadded:: 0.3.0
         """
+        if bow is not None and sweep is not None:
+            raise TypeError(
+                "arc_to() got both 'bow' and 'sweep' — pass one or the other"
+            )
+        a = bow if bow is not None else (sweep if sweep is not None else 0.0)
         row = self._append_row(
-            "ArcTo", [("X", x), ("Y", y), ("A", bow)]
+            "ArcTo", [("X", x), ("Y", y), ("A", a)]
         )
         return ArcTo(row, self)
+
+    def curve_to(
+        self,
+        c1x: float,
+        c1y: float,
+        c2x: float,
+        c2y: float,
+        ex: float,
+        ey: float,
+    ) -> NURBSTo:
+        """Append a cubic Bezier (two control points + endpoint) row.
+
+        Cubic Beziers don't have a dedicated absolute-coordinate row
+        type in the Visio vocabulary — :class:`NURBSTo` (degree-3 NURBS
+        with cubic-Bezier weights and the canonical 4-knot vector) is
+        the canonical encoding Visio desktop emits for what most
+        graphics APIs call a cubic Bezier. The control points are
+        carried inside the C cell's ``NURBS(...)`` formula:
+
+            NURBS(1, 3, 0, 0, c1x, c1y, 1, 1, c2x, c2y, 1, 1)
+
+        See MS Learn's "NURBS function" topic for the full grammar.
+
+        :param c1x: first control point X (absolute, shape-local inches).
+        :param c1y: first control point Y.
+        :param c2x: second control point X.
+        :param c2y: second control point Y.
+        :param ex: endpoint X.
+        :param ey: endpoint Y.
+
+        Returns the :class:`NURBSTo` row proxy so callers can inspect
+        the control-point formula or chain further mutations.
+
+        .. versionadded:: 0.3.0
+        """
+        # NURBS(lastKnot, degree, x_n_weight, last_weight,
+        #       c1x, c1y, weight, knot_1,
+        #       c2x, c2y, weight, knot_2)
+        formula = (
+            "NURBS(1, 3, 0, 0, "
+            f"{_fmt_num(float(c1x))}, {_fmt_num(float(c1y))}, 1, 1, "
+            f"{_fmt_num(float(c2x))}, {_fmt_num(float(c2y))}, 1, 1)"
+        )
+        row = self._section._add_row()
+        row.set("T", "NURBSTo")
+        row.set("IX", str(self._next_ix()))
+        # X / Y endpoint cells (carry IN unit, like every coordinate
+        # cell in this module).
+        for name, value in (("X", ex), ("Y", ey)):
+            cell = row._add_cell()
+            cell.set("N", name)
+            cell.set("V", _fmt_num(float(value)))
+            cell.set("U", "IN")
+        # A / B weight cells.
+        for name, value in (("A", 1.0), ("B", 1.0)):
+            cell = row._add_cell()
+            cell.set("N", name)
+            cell.set("V", _fmt_num(value))
+        # C cell — the NURBS(...) formula carrying the control points.
+        # Visio reads the formula off ``@F``; we also write a minimal
+        # ``@V`` so consumers that only look at ``V`` see a stable
+        # placeholder rather than nothing at all.
+        c_cell = row._add_cell()
+        c_cell.set("N", "C")
+        c_cell.set("V", "0")
+        c_cell.set("F", formula)
+        # D cell — degree=3 (cubic).
+        d_cell = row._add_cell()
+        d_cell.set("N", "D")
+        d_cell.set("V", "3")
+        return NURBSTo(row, self)
+
+    def close(self) -> Optional[LineTo]:
+        """Close the current subpath back to the most recent ``MoveTo``.
+
+        Visio has no dedicated "close path" row type — desktop emits a
+        terminating :class:`LineTo` whose X / Y match the most recent
+        :class:`MoveTo` in the same Geometry section. This helper
+        appends exactly that row and returns it so callers can chain
+        formula tweaks.
+
+        Returns ``None`` (and does nothing) when the path has no
+        ``MoveTo`` to close back to — closing an empty path is a
+        no-op rather than an error so callers can wrap a path-builder
+        loop without checking emptiness up front.
+
+        .. versionadded:: 0.3.0
+        """
+        # Walk backwards through the existing rows for the most recent
+        # MoveTo. Document order is the source of truth — Visio paints
+        # rows in the order they appear, not by ``@IX``.
+        anchor: Optional[CT_Row] = None
+        for r in self._section.row_lst:
+            if r.get("T") == "MoveTo":
+                anchor = r
+        if anchor is None:
+            return None
+        ax = _cell_float(anchor, "X")
+        ay = _cell_float(anchor, "Y")
+        if ax is None or ay is None:
+            return None
+        row = self._append_row("LineTo", [("X", ax), ("Y", ay)])
+        return LineTo(row, self)
 
     def elliptical_arc_to(
         self,
