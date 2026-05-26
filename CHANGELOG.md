@@ -31,6 +31,29 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   and the helper preserves that convention. No-ops (returns ``None``)
   when the path has no ``MoveTo`` to close back to.
 
+### Added — stencil maturity: cross-document master reuse (vsdx-maturity-stencil)
+
+- **`Masters.by_name(name)`** — return the master whose NameU matches
+  *name* or ``None``. Convenience wrapper around the dict-style
+  ``__getitem__`` that avoids the ``KeyError`` for presence checks.
+- **`Masters.add_master(name_u_or_name, base_id=None, unique_id=None)`**
+  — accepts optional ``BaseID`` / ``UniqueID`` GUIDs on the new
+  index entry and a keyword-only ``name=`` alias for *name_u*. The
+  GUIDs identify the master's lineage so cross-document import can
+  match siblings.
+- **`Master.shapes`** — new :class:`MasterShapeTree` proxy exposing
+  ``add_shape("Rectangle", at=(0, 0), size=(1, 1))`` (the keyword-form
+  authoring surface that mirrors :meth:`ShapeTree.add_shape`); also
+  iterable + ``len()``.
+- **`ShapeTree.add_master_instance(master, at=..., size=...)`** —
+  drop an instance of a :class:`Master` from any
+  :class:`VisioDocument` / :class:`Stencil` onto this page. Imports
+  the master into the destination's masters collection on first use
+  (matched by ``BaseID`` then NameU), deep-copying the index entry
+  attributes, ``<PageSheet>``, ``<Icon>``, and ``<MasterContents>``
+  shape tree so the destination is self-contained. Re-using the
+  same master for multiple instances does not duplicate the import.
+
 ### Added — stencil builder API (R16-2)
 
 - **`vsdx.Stencil`** is now a class with authoring-first classmethods

@@ -162,6 +162,139 @@ class ShapeTree(ParentedElementProxy):
             proxy.height = float(size[1])
         return proxy
 
+    def add_master_instance(
+        self,
+        master: "object",
+        at: PointLike = (0.0, 0.0),
+        size: Optional[PointLike] = None,
+    ) -> Shape:
+        """Drop an instance of *master* on this page.
+
+        *master* may be a :class:`~vsdx.master.Master` from this
+        document **or from any other** :class:`~vsdx.document.VisioDocument`
+        / :class:`~vsdx.stencil.Stencil`. If the master does not yet
+        exist in this document's :class:`~vsdx.master.Masters`
+        collection (matched by ``@BaseID`` when supplied, then by
+        NameU as a fallback), it is *copied* into the destination
+        first — its index entry attributes (``Name``, ``NameU``,
+        ``BaseID``, ``UniqueID`` if present), its master-contents
+        part bytes (the ``<MasterContents>`` shape tree), and its
+        ``<PageSheet>`` cells from the index entry. A fresh master
+        ``@ID`` is allocated by the destination's
+        :meth:`~vsdx.parts.master.MastersPart.add_master_part` so
+        the import does not collide with existing IDs.
+
+        After registration, a new ``<Shape>`` is dropped on this page
+        with ``@Master=<NameU>`` and *at* / *size* applied.
+
+        :param master: a :class:`~vsdx.master.Master` proxy.
+        :param at: ``(pin_x, pin_y)`` in inches.
+        :param size: optional ``(width, height)``; when ``None`` the
+            instance inherits its size from the master's PageSheet.
+        :returns: the newly-dropped :class:`Shape` proxy.
+
+        .. versionadded:: 0.3.0
+        """
+        # -- local import to dodge cycle ----------------------------------
+        from vsdx.master import Master
+
+        if not isinstance(master, Master):
+            raise TypeError(
+                "add_master_instance expected a vsdx.master.Master, got %r"
+                % type(master).__name__
+            )
+
+        page = self._parent
+        # Walk up to the owning VisioDocument via Page → Pages → doc.
+        # ``Page._parent`` is the Pages collection, whose ``_parent``
+        # is the VisioDocument.
+        dest_doc = page._parent._parent  # type: ignore[attr-defined]
+        dest_masters = dest_doc.masters
+
+        # 1. Find or import the master in destination masters.
+        local = self._find_local_master(dest_masters, master)
+        if local is None:
+            local = self._import_master(dest_masters, master)
+
+        # 2. Drop the shape referencing the (now-local) master.
+        return self.add_shape_from_master(local.name_u, at=at, size=size)
+
+    @staticmethod
+    def _find_local_master(dest_masters, source_master):
+        """Return the destination master matching *source_master*, or None.
+
+        Match priority: ``@BaseID`` (if both have one) → NameU.
+        ``@BaseID`` is the canonical lineage marker so we prefer it
+        when available; NameU is the friendly fallback.
+        """
+        src_base_id = source_master.base_id
+        if src_base_id:
+            for m in dest_masters:
+                if m.base_id == src_base_id:
+                    return m
+        return dest_masters.by_name(source_master.name_u)
+
+    @staticmethod
+    def _import_master(dest_masters, source_master):
+        """Copy *source_master* into *dest_masters*.
+
+        Three coordinated copies:
+        * the ``<Master>`` index entry's optional attributes
+          (``BaseID`` / ``UniqueID`` / ``MasterType`` / ``Hidden`` /
+          ``IconSize`` / ``PatternFlags`` / ``Prompt`` / ``AlignName``);
+        * the ``<PageSheet>`` child carrying default-cell data;
+        * the master-contents part's root element (``<MasterContents>``)
+          — deep-cloned so the destination has its own tree, not a
+          live reference into the source document's parts graph.
+        """
+        from copy import deepcopy
+
+        new_master = dest_masters.add_master(
+            source_master.name_u,
+            base_id=source_master.base_id,
+            unique_id=source_master.unique_id,
+        )
+
+        # -- propagate index-entry attributes --
+        src_index_el = source_master._element  # noqa: SLF001
+        for attr in (
+            "MasterType",
+            "Hidden",
+            "MatchByName",
+            "IconSize",
+            "PatternFlags",
+            "Prompt",
+            "AlignName",
+            "IconUpdate",
+        ):
+            v = src_index_el.get(attr)
+            if v is not None:
+                new_master._element.set(attr, v)
+
+        # -- copy the <PageSheet> default-cells from the index entry --
+        src_page_sheet = getattr(src_index_el, "pageSheet", None)
+        if src_page_sheet is not None:
+            cloned_ps = deepcopy(src_page_sheet)
+            # Replace whatever PageSheet exists on the new master entry.
+            existing_ps = getattr(new_master._element, "pageSheet", None)
+            if existing_ps is not None:
+                new_master._element.remove(existing_ps)
+            new_master._element.append(cloned_ps)
+
+        # -- copy the <Icon> if present --
+        src_icon = getattr(src_index_el, "icon", None)
+        if src_icon is not None:
+            new_master._element.append(deepcopy(src_icon))
+
+        # -- copy the master-contents shape tree --
+        src_contents_part = source_master._master_part  # noqa: SLF001
+        src_contents_el = src_contents_part.element
+        # Replace the destination master-contents element wholesale.
+        cloned_contents = deepcopy(src_contents_el)
+        new_master._master_part._element = cloned_contents  # noqa: SLF001
+
+        return new_master
+
     def add_connector(
         self,
         from_shape: Shape,

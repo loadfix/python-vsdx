@@ -150,6 +150,26 @@ class Master(PartElementProxy):
 
     # -- build-time shape authoring -------------------------------------
 
+    @property
+    def shapes(self) -> "MasterShapeTree":
+        """Shape-tree wrapper over this master's ``<MasterContents>``.
+
+        Mirrors :attr:`~vsdx.page.Page.shapes` so callers can author
+        masters with the familiar ``add_shape("Rectangle", at=(0,0),
+        size=(1,1))`` keyword form. The thin :class:`MasterShapeTree`
+        wrapper delegates to :meth:`add_shape` underneath, allocating
+        a fresh shape ID per call.
+
+        Example::
+
+            stencil = vsdx.Stencil.new()
+            m = stencil.masters.add_master("MyBox")
+            m.shapes.add_shape("Rectangle", at=(0, 0), size=(1, 1))
+
+        .. versionadded:: 0.3.0
+        """
+        return MasterShapeTree(self)
+
     def add_shape(
         self,
         name: str,
@@ -204,6 +224,58 @@ class Master(PartElementProxy):
             cell.set("V", _fmt_num(float(value)))
             cell.set("U", "IN")
         return shape_el
+
+
+class MasterShapeTree:
+    """Thin authoring wrapper over a :class:`Master`'s ``<MasterContents>``.
+
+    Mirrors :class:`vsdx.shapes.shapetree.ShapeTree`'s ``add_shape``
+    keyword form so the stencil-authoring surface reads symmetrically
+    with the page-authoring surface. The wrapper delegates back to
+    :meth:`Master.add_shape` for the heavy lifting; iteration / index
+    access yield the raw ``CT_Shape`` elements (the master-shape proxy
+    layer is intentionally shallow at 0.3.0 — masters are templates,
+    not fully-typed editable surfaces).
+
+    .. versionadded:: 0.3.0
+    """
+
+    def __init__(self, master: "Master") -> None:
+        self._master = master
+
+    def add_shape(
+        self,
+        shape_type,
+        at: tuple[float, float] = (0.0, 0.0),
+        size: tuple[float, float] = (1.0, 1.0),
+    ) -> Any:
+        """Stamp a built-in autoshape into the master's contents.
+
+        :param shape_type: a :class:`~vsdx.enum.shapes.VS_SHAPE_TYPE`
+            member or a NameU string. The string is written into both
+            the shape's ``@Name`` and ``@NameU``.
+        :param at: ``(pin_x, pin_y)`` in inches.
+        :param size: ``(width, height)`` in inches.
+        :returns: the raw ``CT_Shape`` element.
+        """
+        name = shape_type.value if hasattr(shape_type, "value") else str(shape_type)
+        x, y = float(at[0]), float(at[1])
+        w, h = float(size[0]), float(size[1])
+        return self._master.add_shape(name, x=x, y=y, width=w, height=h)
+
+    def __iter__(self):
+        contents = self._master._master_part.element
+        shapes_el = getattr(contents, "shapes", None)
+        if shapes_el is None:
+            return iter(())
+        return iter(getattr(shapes_el, "shape_lst", []))
+
+    def __len__(self) -> int:
+        contents = self._master._master_part.element
+        shapes_el = getattr(contents, "shapes", None)
+        if shapes_el is None:
+            return 0
+        return len(getattr(shapes_el, "shape_lst", []))
 
 
 class Masters(ParentedElementProxy):
@@ -268,12 +340,68 @@ class Masters(ParentedElementProxy):
                 return m
         return None
 
+    def by_name(self, name: str) -> Optional[Master]:
+        """Return the master whose NameU matches *name*, or ``None``.
+
+        Convenience wrapper around the dict-style ``__getitem__`` that
+        avoids the ``KeyError`` when callers want a presence check
+        rather than a lookup. Mirrors ``pptx.SlideLayouts.by_name``.
+
+        :param name: NameU to match.
+        :returns: the matching :class:`Master` or ``None`` when no
+            master with that NameU exists.
+
+        .. versionadded:: 0.3.0
+        """
+        for m in self._master_cache:
+            if m.name_u == name:
+                return m
+        return None
+
     # -- authoring ------------------------------------------------------
 
-    def add_master(self, name_u: str) -> Master:
-        """Add a new master with *name_u* and return its proxy."""
+    def add_master(
+        self,
+        name_u: Optional[str] = None,
+        base_id: Optional[str] = None,
+        unique_id: Optional[str] = None,
+        *,
+        name: Optional[str] = None,
+    ) -> Master:
+        """Add a new master and return its proxy.
+
+        :param name_u: NameU (and Name) for the new master. Positional
+            for back-compat with the 0.1.0 ``add_master("Foo")`` form.
+        :param base_id: optional ``@BaseID`` GUID (``"{...}"``). When
+            supplied, identifies the master's lineage so that copies of
+            this master in other documents are recognised as siblings.
+            ``None`` leaves the attribute off. ``[Added in 0.3.0]``
+        :param unique_id: optional ``@UniqueID`` GUID. When supplied,
+            stamped on the index entry; useful when reproducing a
+            master from an external stencil. ``None`` leaves the
+            attribute off. ``[Added in 0.3.0]``
+        :param name: keyword-only alias for *name_u* — the stencil-
+            authoring brief uses ``add_master(name="MyBox")`` so we
+            accept either spelling. Supplying both raises
+            :class:`TypeError`. ``[Added in 0.3.0]``
+        """
+        if name is not None:
+            if name_u is not None:
+                raise TypeError(
+                    "add_master() received both 'name_u' and 'name' — "
+                    "they're aliases; pass exactly one"
+                )
+            name_u = name
+        if name_u is None:
+            raise TypeError(
+                "add_master() missing required argument 'name_u' (or 'name')"
+            )
         mp = self._masters_part.add_master_part(name_u)
         master = Master(mp, self)
+        if base_id is not None:
+            master._element.set("BaseID", base_id)
+        if unique_id is not None:
+            master._element.set("UniqueID", unique_id)
         self._master_cache.append(master)
         return master
 
@@ -298,4 +426,4 @@ class Masters(ParentedElementProxy):
         ]
 
 
-__all__ = ["BUILT_IN_MASTER_NAMES", "Master", "Masters"]
+__all__ = ["BUILT_IN_MASTER_NAMES", "Master", "MasterShapeTree", "Masters"]
