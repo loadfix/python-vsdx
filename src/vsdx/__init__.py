@@ -77,7 +77,7 @@ from vsdx.geometry import (
     SplineStart,
     UnknownGeometryRow,
 )
-from vsdx.layers import Layer, Layers
+from vsdx.layers import Layer, Layers, ShapeLayers
 from vsdx.master import Master, Masters
 from vsdx.page import Page, Pages
 from vsdx.print_setup import PRINT_ORIENTATION, PrintSetup
@@ -96,6 +96,7 @@ from vsdx.shape_data import (
 from vsdx.shapes import (
     Connector,
     Ellipse,
+    GroupMembers,
     GroupShape,
     Rectangle,
     Shape,
@@ -152,6 +153,7 @@ __all__ = [
     "Geometries",
     "Geometry",
     "GeometryRow",
+    "GroupMembers",
     "GroupShape",
     "Hyperlink",
     "HyperlinkCollection",
@@ -201,6 +203,7 @@ __all__ = [
     "Shape",
     "ShapeData",
     "ShapeDataField",
+    "ShapeLayers",
     "ShapeTree",
     "SplineKnot",
     "SplineStart",

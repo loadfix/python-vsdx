@@ -348,6 +348,65 @@ class ShapeTree(ParentedElementProxy):
         """
         return _group_shapes_impl(self, shapes)
 
+    def add_group(
+        self,
+        at: PointLike = (0.0, 0.0),
+        size: PointLike = (1.0, 1.0),
+        text: Optional[str] = None,
+        name: Optional[str] = None,
+    ) -> GroupShape:
+        """Add an empty user-authored group shape and return its proxy.
+
+        Unlike :meth:`group` (which aggregates existing top-level
+        shapes into a group), this creates a fresh empty
+        ``<Shape Type="Group">`` with the supplied page-scoped
+        position and size. Add members afterwards via the returned
+        group's nested :attr:`GroupShape.shapes` collection::
+
+            group = page.shapes.add_group(at=(1, 1), size=(4, 3))
+            group.shapes.add_shape("Rectangle", at=(0, 0), size=(1, 1))
+            group.shapes.add_shape("Ellipse",   at=(2, 0), size=(1, 1))
+
+        :param at: ``(pin_x, pin_y)`` tuple in inches — the group's
+            centre-pin position on the page.
+        :param size: ``(width, height)`` tuple in inches.
+        :param text: optional initial group-level text.
+        :param name: optional ``@NameU`` / ``@Name`` for the group
+            element. Most user-authored groups have no name; if you
+            supply one we set both ``NameU`` and ``Name``.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.enum.cells import ST_Unit
+        from vsdx.shapes.base import _set_cell_float
+
+        page_shapes = self._element.shapes_element
+        group_el = page_shapes._add_shape()
+        group_el.set("Type", VS_SHAPE_TYPE.GROUP.value)
+
+        page = self._parent
+        group_el.shape_id = page.next_shape_id()
+        if name is not None:
+            group_el.set("NameU", str(name))
+            group_el.set("Name", str(name))
+
+        # Materialise the nested <Shapes> child so member-add hits a
+        # ready-to-go container instead of creating it lazily on first
+        # add (which complicates round-trip diffs for empty groups).
+        group_el.get_or_add_shapes()
+
+        pin_x, pin_y = float(at[0]), float(at[1])
+        w, h = float(size[0]), float(size[1])
+        _set_cell_float(group_el, "PinX", pin_x, ST_Unit.INCHES.value)
+        _set_cell_float(group_el, "PinY", pin_y, ST_Unit.INCHES.value)
+        _set_cell_float(group_el, "Width", w, ST_Unit.INCHES.value)
+        _set_cell_float(group_el, "Height", h, ST_Unit.INCHES.value)
+
+        proxy = GroupShape(group_el, self)
+        if text is not None:
+            proxy.text = text
+        return proxy
+
     # -- helpers --------------------------------------------------------
 
     def _proxy_for(self, shape_el: "CT_Shape") -> Shape:

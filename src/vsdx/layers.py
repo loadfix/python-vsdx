@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from vsdx.oxml._stubs import CT_Row, CT_Section  # TODO(vsdx/track-1)
     from vsdx.page import Page
 
-__all__ = ["Layer", "Layers"]
+__all__ = ["Layer", "Layers", "ShapeLayers"]
 
 
 _LAYER_SECTION_NAME = "Layer"
@@ -507,6 +507,116 @@ def _shape_layers_proxy(shape, page):
     page_layers = page.layers
     lookup = {layer.index: layer for layer in page_layers}
     return [lookup[ix] for ix in indices if ix in lookup]
+
+
+# ---------------------------------------------------------------------------
+# ShapeLayers — per-shape layer-membership proxy
+# ---------------------------------------------------------------------------
+
+
+class ShapeLayers:
+    """Layer-membership view on a single :class:`~vsdx.shapes.base.Shape`.
+
+    Iterates the shape's ``<Cell N="LayerMember">`` indices, resolved
+    against the owning page's :class:`Layers` collection. Supports the
+    ergonomic membership idiom::
+
+        shape.layers.add(layer)
+        shape.layers.remove(layer)
+        assert layer in shape.layers
+        for L in shape.layers: ...
+        len(shape.layers)
+
+    Behaves like a list of :class:`Layer` proxies for read-only iteration
+    so existing call-sites that did ``for L in shape.layers`` /
+    ``len(shape.layers)`` / ``layer in shape.layers`` keep working
+    unchanged. The :meth:`add` / :meth:`remove` mutators delegate to
+    :meth:`Shape.add_to_layer` / :meth:`Shape.remove_from_layer` to
+    preserve the canonical ordering invariant (scoping-doc §2.5
+    invariant #3).
+
+    Construct indirectly via :attr:`Shape.layers` — callers do not
+    instantiate this class directly.
+
+    .. versionadded:: 0.3.0
+    """
+
+    def __init__(self, shape) -> None:
+        self._shape = shape
+
+    # -- container ------------------------------------------------------
+
+    def _resolved(self) -> List[Layer]:
+        """Resolve this shape's LayerMember indices to live Layer proxies."""
+        from vsdx.page import Page  # local import dodges a cycle
+        from vsdx.shapes.shapetree import ShapeTree
+
+        parent = self._shape._parent
+        if isinstance(parent, ShapeTree):
+            page = parent._parent
+        elif isinstance(parent, Page):
+            page = parent
+        else:
+            climbing = parent
+            while climbing is not None and not isinstance(climbing, Page):
+                climbing = getattr(climbing, "_parent", None)
+            page = climbing
+        if page is None:
+            return []
+        return _shape_layers_proxy(self._shape, page)
+
+    def __iter__(self) -> Iterator[Layer]:
+        return iter(self._resolved())
+
+    def __len__(self) -> int:
+        return len(self._resolved())
+
+    def __getitem__(self, idx: int) -> Layer:
+        return self._resolved()[idx]
+
+    def __contains__(self, layer: object) -> bool:
+        if not isinstance(layer, Layer):
+            return False
+        target_ix = layer.index
+        return target_ix in _shape_layer_indices(self._shape._element)
+
+    def __bool__(self) -> bool:
+        return len(self) > 0
+
+    def __eq__(self, other: object) -> bool:
+        # Equate with a plain list of Layer proxies for back-compat with
+        # ``shape.layers == [...]`` style assertions.
+        if isinstance(other, list):
+            return self._resolved() == other
+        if isinstance(other, ShapeLayers):
+            return self._shape is other._shape
+        return NotImplemented
+
+    def __repr__(self) -> str:
+        return "<ShapeLayers %r>" % [layer.name for layer in self._resolved()]
+
+    # -- authoring ------------------------------------------------------
+
+    def add(self, layer: Layer) -> Layer:
+        """Add *layer* to this shape's membership (idempotent).
+
+        Mirrors :meth:`Shape.add_to_layer` and returns *layer* so
+        chained calls like ``shape.layers.add(L).visible`` read
+        naturally.
+
+        .. versionadded:: 0.3.0
+        """
+        self._shape.add_to_layer(layer)
+        return layer
+
+    def remove(self, layer: Layer) -> None:
+        """Remove *layer* from this shape's membership (idempotent).
+
+        Mirrors :meth:`Shape.remove_from_layer`.
+
+        .. versionadded:: 0.3.0
+        """
+        self._shape.remove_from_layer(layer)
 
 
 # -- unused-import guard --

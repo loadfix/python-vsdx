@@ -536,6 +536,26 @@ class Page(PartElementProxy):
             )
         self._element.set("BackPage", target_name)
 
+    @property
+    def background(self) -> Optional["Page"]:
+        """Short spelling for :attr:`background_page`.
+
+        Reads / writes the same ``@BackPage`` attribute. The grammatical
+        ``page.background = back`` reads naturally next to
+        ``page.is_background = True`` so it's the spelling we
+        recommend in 0.3.0+.
+
+        Assigning ``None`` clears the reference; assigning a non-
+        background :class:`Page` raises :class:`ValueError`.
+
+        .. versionadded:: 0.3.0
+        """
+        return self.background_page
+
+    @background.setter
+    def background(self, value: Optional["Page"]) -> None:
+        self.background_page = value
+
     # -- theme override -------------------------------------------------
 
     @property
@@ -819,13 +839,45 @@ class Pages(ParentedElementProxy):
         name: Optional[str] = None,
         width: float = 8.5,
         height: float = 11.0,
+        background: bool = False,
     ) -> Page:
-        """Add a new page and return its :class:`Page` proxy."""
-        name = name or f"Page-{len(self._page_cache) + 1}"
+        """Add a new page and return its :class:`Page` proxy.
+
+        :param name: optional ``@NameU`` for the page; defaults to
+            ``"Page-N"`` (or ``"VBackground-N"`` when *background* is
+            ``True`` and *name* is ``None``).
+        :param width: page width in inches (default ``8.5``).
+        :param height: page height in inches (default ``11.0``).
+        :param background: when ``True``, the page is created with
+            ``@Background="1"`` so it can be referenced by foreground
+            pages via :attr:`Page.background`. See 0.2.0 scoping doc
+            §5.1. ``[Added in 0.3.0]``.
+
+        .. versionchanged:: 0.3.0
+            Added the *background* keyword argument so background-page
+            authoring matches the foreground spelling and avoids the
+            two-call ``add_page(...)`` + ``page.is_background = True``
+            dance for the common case.
+        """
+        if background and name is None:
+            # Match :meth:`add_background_page`'s auto-naming rule so
+            # ``add_page(background=True)`` and ``add_background_page()``
+            # converge on the same default identity for callers that
+            # mix the two spellings.
+            base = "VBackground"
+            existing = {p._element.get("NameU") for p in self._page_cache}
+            idx = 1
+            while f"{base}-{idx}" in existing:
+                idx += 1
+            name = f"{base}-{idx}"
+        else:
+            name = name or f"Page-{len(self._page_cache) + 1}"
         page_part = self._pages_part.add_page_part(name)
         page_part.page_element.set("PageWidth", _fmt(width))
         page_part.page_element.set("PageHeight", _fmt(height))
         page = Page(page_part, self)
+        if background:
+            page.is_background = True
         self._page_cache.append(page)
         return page
 
@@ -838,22 +890,19 @@ class Pages(ParentedElementProxy):
         """Add a new background page and return its :class:`Page` proxy.
 
         The page is created with ``@Background="1"`` — use
-        :attr:`Page.background_page` on a foreground page to wire the
-        reference. See 0.2.0 scoping doc §5.4.
+        :attr:`Page.background` (or :attr:`Page.background_page`) on a
+        foreground page to wire the reference. See 0.2.0 scoping doc
+        §5.4.
+
+        Equivalent to :meth:`add_page` ``(background=True)`` introduced
+        in 0.3.0; both call sites converge on the same auto-naming
+        rule (``VBackground-1`` / ``-2`` / …).
 
         .. versionadded:: 0.2.0
         """
-        # Default the name to a non-conflicting background-page name.
-        if name is None:
-            base = "VBackground"
-            existing = {p._element.get("NameU") for p in self._page_cache}
-            idx = 1
-            while f"{base}-{idx}" in existing:
-                idx += 1
-            name = f"{base}-{idx}"
-        page = self.add_page(name=name, width=width, height=height)
-        page.is_background = True
-        return page
+        return self.add_page(
+            name=name, width=width, height=height, background=True
+        )
 
     # -- filter views ---------------------------------------------------
 

@@ -327,3 +327,130 @@ class DescribeLayerDeleteRenumber:
         # Cell should be gone entirely; a shape with no layers has no cell.
         from vsdx.layers import _shape_layer_indices
         assert _shape_layer_indices(shape._element) == []
+
+
+class DescribeShapeLayersProxy:
+    """0.3.0 ergonomic ``shape.layers.add(...)`` membership proxy.
+
+    The :attr:`Shape.layers` accessor returns a
+    :class:`~vsdx.layers.ShapeLayers` view that supports both the
+    read-only list idiom (existing call-sites) and the new
+    ``.add(layer)`` / ``.remove(layer)`` mutators.
+    """
+
+    def it_returns_a_shape_layers_proxy(self) -> None:
+        from vsdx.layers import ShapeLayers
+
+        _, page = _fresh_page()
+        shape = page.shapes[0]
+        assert isinstance(shape.layers, ShapeLayers)
+
+    def it_adds_a_layer_via_layers_add(self) -> None:
+        _, page = _fresh_page()
+        draft = page.layers.add("Draft")
+        shape = page.shapes[0]
+        shape.layers.add(draft)
+        assert [L.name for L in shape.layers] == ["Draft"]
+
+    def it_returns_the_added_layer_for_chaining(self) -> None:
+        _, page = _fresh_page()
+        draft = page.layers.add("Draft")
+        shape = page.shapes[0]
+        result = shape.layers.add(draft)
+        assert result is draft
+
+    def it_supports_in_membership_test(self) -> None:
+        _, page = _fresh_page()
+        draft = page.layers.add("Draft")
+        final = page.layers.add("Final")
+        shape = page.shapes[0]
+        shape.layers.add(draft)
+        assert draft in shape.layers
+        assert final not in shape.layers
+
+    def it_in_membership_handles_non_layer_arguments(self) -> None:
+        _, page = _fresh_page()
+        page.layers.add("Draft")
+        shape = page.shapes[0]
+        # ``"Draft" in shape.layers`` must not raise — it's just False.
+        assert "Draft" not in shape.layers
+        assert 0 not in shape.layers
+
+    def it_removes_a_layer_via_layers_remove(self) -> None:
+        _, page = _fresh_page()
+        draft = page.layers.add("Draft")
+        final = page.layers.add("Final")
+        shape = page.shapes[0]
+        shape.layers.add(draft)
+        shape.layers.add(final)
+        shape.layers.remove(draft)
+        assert [L.name for L in shape.layers] == ["Final"]
+
+    def it_remove_is_idempotent(self) -> None:
+        _, page = _fresh_page()
+        draft = page.layers.add("Draft")
+        shape = page.shapes[0]
+        # Not a member — remove must not raise.
+        shape.layers.remove(draft)
+        assert list(shape.layers) == []
+
+    def it_add_is_idempotent(self) -> None:
+        _, page = _fresh_page()
+        draft = page.layers.add("Draft")
+        shape = page.shapes[0]
+        shape.layers.add(draft)
+        shape.layers.add(draft)
+        assert _shape_layer_indices(shape._element) == [0]
+
+    def it_supports_len_and_bool(self) -> None:
+        _, page = _fresh_page()
+        draft = page.layers.add("Draft")
+        shape = page.shapes[0]
+        assert len(shape.layers) == 0
+        assert not shape.layers
+        shape.layers.add(draft)
+        assert len(shape.layers) == 1
+        assert shape.layers
+
+    def it_supports_indexed_access(self) -> None:
+        _, page = _fresh_page()
+        draft = page.layers.add("Draft")
+        final = page.layers.add("Final")
+        shape = page.shapes[0]
+        shape.layers.add(draft)
+        shape.layers.add(final)
+        assert shape.layers[0].name == "Draft"
+        assert shape.layers[1].name == "Final"
+
+    def it_compares_equal_to_the_resolved_layer_list(self) -> None:
+        _, page = _fresh_page()
+        draft = page.layers.add("Draft")
+        shape = page.shapes[0]
+        shape.layers.add(draft)
+        # Equality with a same-shape ShapeLayers reads as same-identity.
+        assert shape.layers == shape.layers
+        # Equality with a list compares element-wise; Layer proxies do
+        # not implement __eq__ so we compare by index instead.
+        assert [L.index for L in shape.layers] == [draft.index]
+
+    def it_repr_lists_layer_names(self) -> None:
+        _, page = _fresh_page()
+        draft = page.layers.add("Draft")
+        shape = page.shapes[0]
+        shape.layers.add(draft)
+        assert "Draft" in repr(shape.layers)
+
+    def it_brief_example_round_trips(self) -> None:
+        # The brief example: page.layers.add(...) returns layer, then
+        # ``shape.layers.add(layer)`` joins the shape, and
+        # ``layer in shape.layers`` confirms membership.
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="Page-1")
+        back_layer = page.layers.add(
+            "Annotations", color="FF0000", visible=True
+        )
+        shape = page.shapes.add_shape(
+            vsdx.VS_SHAPE_TYPE.RECTANGLE, at=(1, 1)
+        )
+        shape.layers.add(back_layer)
+        assert back_layer in shape.layers
