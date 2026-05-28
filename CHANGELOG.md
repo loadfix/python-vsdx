@@ -6,6 +6,33 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — SVG import (#51)
+
+- **`Page.add_svg(path)`** / **`Page.add_svg_string(text)`** — parse
+  an SVG document into editable Visio shapes appended to a page.
+  Pure-Python parser built on the stdlib `xml.etree.ElementTree`;
+  no third-party SVG dependency.
+- **Supported elements** — `<rect>` (rectangle autoshape), `<circle>`
+  / `<ellipse>` (ellipse autoshape), `<line>` (free-floating
+  two-point polyline), `<polyline>` / `<polygon>` (open / closed
+  custom-geometry shape), `<path>` (M / L / H / V / Z honoured;
+  curves and arcs collapse to straight lines to the endpoint),
+  `<text>` (master-less text shape), `<g>` (rendered as a
+  `GroupShape` aggregating its descendants).
+- **Supported attributes** — `fill`, `stroke`, `stroke-width`,
+  `transform="translate(x, y)"`. Hex (`#RRGGBB` / `#RGB`), `rgb(r, g, b)`,
+  and a 47-entry CSS-named-colour table are recognised; unknown
+  paints fall back to the master default.
+- **Unit handling** — `px` resolves at 72 DPI per the issue brief;
+  `pt` / `pc` / `mm` / `cm` / `in` are all honoured. The Y axis
+  is flipped against the SVG canvas height so a top-anchored SVG
+  rectangle lands at the visually-equivalent Visio position.
+- **Out of scope (documented)** — gradients, filters, masks,
+  `<clipPath>`, animations, embedded raster, CSS via `<style>`,
+  text styling (font / size / anchor), and SVG transforms beyond
+  `translate` (rotate / scale / matrix). See `vsdx.from_svg` module
+  docstring for the complete list.
+
 ### Added — PlantUML import (#124)
 
 - **`VisioDocument.from_plantuml(path)`** /

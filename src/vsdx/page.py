@@ -1175,6 +1175,52 @@ class Page(PartElementProxy):
 
         return _build_layered_view_for_page(self, layers=layers, name=name)
 
+    # -- SVG import (issue #51) ----------------------------------------
+
+    def add_svg(self, path: str) -> "list[Shape]":
+        """Parse *path* (an SVG file) and append its shapes to this page.
+
+        Pure-Python parser built on the stdlib
+        :mod:`xml.etree.ElementTree`; no third-party SVG dependency
+        and no `cairo` / `librsvg` binary required. Returns the list
+        of top-level :class:`~vsdx.shapes.base.Shape` instances
+        created — descendants of imported ``<g>`` groups are reachable
+        via the group's nested shape collection rather than the
+        returned list.
+
+        Supported elements: ``<rect>``, ``<circle>``, ``<ellipse>``,
+        ``<line>``, ``<polyline>``, ``<polygon>``, ``<path>`` (M / L /
+        H / V / Z, with curves and arcs collapsing to straight lines),
+        ``<text>``, ``<g>``. ``fill`` / ``stroke`` / ``stroke-width``
+        and ``transform="translate(...)"`` are honoured. Gradients,
+        filters, masks, clipPath, animations, and embedded raster are
+        out of scope — see :mod:`vsdx.from_svg` for the full
+        conventions.
+
+        :param path: filesystem path to a ``.svg`` file.
+
+        .. versionadded:: 0.4.0
+        """
+        from vsdx.from_svg import add_svg_to_page
+
+        return add_svg_to_page(self, path)
+
+    def add_svg_string(self, text: str) -> "list[Shape]":
+        """Parse *text* (SVG source) and append its shapes to this page.
+
+        Sister method of :meth:`add_svg` accepting an in-memory
+        string — useful when the SVG is built dynamically rather
+        than read from disk. See :meth:`add_svg` for the supported
+        element subset and return contract.
+
+        :param text: SVG document source as a Python string.
+
+        .. versionadded:: 0.4.0
+        """
+        from vsdx.from_svg import add_svg_string_to_page
+
+        return add_svg_string_to_page(self, text)
+
     # -- SVG export -----------------------------------------------------
 
     def to_svg(self, path: Optional[str] = None) -> str:
