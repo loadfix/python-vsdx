@@ -44,6 +44,10 @@ Available kits:
   :func:`vsdx.kit.uml.uml_from_typescript` — UML class diagrams
   authored by introspecting a Python module, walking a JSON Schema
   document, or regex-parsing TypeScript source (issue #131).
+* :func:`vsdx.kit.from_workbook.diagram_from_xlsx` — workbook →
+  diagram dispatcher: read an ``.xlsx`` data table and delegate to
+  the matching kit builder (issue #136). Wraps the builders above;
+  no new diagram logic.
 
 The kit modules avoid third-party runtime deps so they remain
 import-light. The ``[kit]`` extra in ``pyproject.toml`` is reserved
@@ -89,6 +93,32 @@ from vsdx.kit.floor_plan import (
     UNIT_TOKENS,
     build_floor_plan,
 )
+from vsdx.kit.from_workbook import (
+    DEFAULT_FLOWS_SHEET,
+    DEFAULT_LANES_SHEET,
+    DEFAULT_STEPS_SHEET,
+    DIAGRAM_KINDS,
+    ERD_DEFAULT_COLUMN_COL,
+    ERD_DEFAULT_CONSTRAINT_COL,
+    ERD_DEFAULT_TABLE_COL,
+    ERD_DEFAULT_TYPE_COL,
+    KIND_ERD,
+    KIND_ORG_CHART,
+    KIND_PROCESS_MAP,
+    KIND_SWIM_LANE,
+    ORG_CHART_DEFAULT_MANAGER_COL,
+    ORG_CHART_DEFAULT_NAME_COL,
+    ORG_CHART_DEFAULT_PHOTO_COL,
+    ORG_CHART_DEFAULT_TEAM_COL,
+    ORG_CHART_DEFAULT_TITLE_COL,
+    PROCESS_DEFAULT_FROM_COL,
+    PROCESS_DEFAULT_KIND_COL,
+    PROCESS_DEFAULT_LANE_COL,
+    PROCESS_DEFAULT_ON_COL,
+    PROCESS_DEFAULT_TEXT_COL,
+    PROCESS_DEFAULT_TO_COL,
+    diagram_from_xlsx,
+)
 from vsdx.kit.org_chart import (
     DEFAULT_MANAGER_COL,
     DEFAULT_NAME_COL,
@@ -127,15 +157,23 @@ from vsdx.kit.uml import (
 )
 
 __all__ = [
+    "DEFAULT_FLOWS_SHEET",
+    "DEFAULT_LANES_SHEET",
     "DEFAULT_MANAGER_COL",
     "DEFAULT_NAME_COL",
     "DEFAULT_PHOTO_COL",
+    "DEFAULT_STEPS_SHEET",
     "DEFAULT_TEAM_COL",
     "DEFAULT_TITLE_COL",
+    "DIAGRAM_KINDS",
     "ERD_CONSTRAINT_FK_PREFIX",
     "ERD_CONSTRAINT_NOT_NULL",
     "ERD_CONSTRAINT_PK",
     "ERD_CONSTRAINT_UNIQUE",
+    "ERD_DEFAULT_COLUMN_COL",
+    "ERD_DEFAULT_CONSTRAINT_COL",
+    "ERD_DEFAULT_TABLE_COL",
+    "ERD_DEFAULT_TYPE_COL",
     "FISHBONE_BRANCH_ANGLE_DEG",
     "FISHBONE_DEFAULT_CATEGORIES",
     "FIXTURE_KIND_DOOR",
@@ -150,7 +188,22 @@ __all__ = [
     "FURNITURE_KIND_SOFA",
     "FURNITURE_KIND_TABLE",
     "FURNITURE_KINDS",
+    "KIND_ERD",
+    "KIND_ORG_CHART",
+    "KIND_PROCESS_MAP",
+    "KIND_SWIM_LANE",
     "METERS_PER_FOOT",
+    "ORG_CHART_DEFAULT_MANAGER_COL",
+    "ORG_CHART_DEFAULT_NAME_COL",
+    "ORG_CHART_DEFAULT_PHOTO_COL",
+    "ORG_CHART_DEFAULT_TEAM_COL",
+    "ORG_CHART_DEFAULT_TITLE_COL",
+    "PROCESS_DEFAULT_FROM_COL",
+    "PROCESS_DEFAULT_KIND_COL",
+    "PROCESS_DEFAULT_LANE_COL",
+    "PROCESS_DEFAULT_ON_COL",
+    "PROCESS_DEFAULT_TEXT_COL",
+    "PROCESS_DEFAULT_TO_COL",
     "PROCESS_KIND_DECISION",
     "PROCESS_KIND_END",
     "PROCESS_KIND_START",
@@ -176,6 +229,7 @@ __all__ = [
     "build_process_map",
     "build_sipoc",
     "build_swim_lane_diagram",
+    "diagram_from_xlsx",
     "erd_from_models",
     "erd_from_sql",
     "uml_from_json_schema",

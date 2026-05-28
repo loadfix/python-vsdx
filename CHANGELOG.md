@@ -6,6 +6,7 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+<<<<<<< HEAD
 ### Added — UML class diagram template kit (#131)
 
 - **`vsdx.kit.uml.uml_from_python_module`** — author a UML class
@@ -37,6 +38,45 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   constants are reachable as ``vsdx.kit.uml_from_python_module`` /
   ``vsdx.kit.uml_from_json_schema`` / ``vsdx.kit.uml_from_typescript``
   / ``vsdx.kit.UML_RELATIONS``.
+=======
+### Added — workbook → Visio dispatcher (#136)
+
+- **`vsdx.kit.from_workbook.diagram_from_xlsx`** — read an ``.xlsx``
+  data table and author the matching Visio diagram in one call. The
+  ``kind`` kwarg picks the downstream builder
+  (:data:`KIND_ORG_CHART` / :data:`KIND_ERD` /
+  :data:`KIND_PROCESS_MAP` / :data:`KIND_SWIM_LANE`); column-name
+  defaults are spelt in human-readable title case (``"Name"``,
+  ``"Manager"``, ``"Table"``, ``"Column"``, ``"Text"``, ``"Lane"``,
+  …) and overridable per-call.
+- **Pure composition** — the dispatcher is an adapter, not a
+  renderer. Each branch projects rows into the dict / list shape
+  the matching kit builder already accepts and delegates to
+  :func:`vsdx.kit.org_chart.build_org_chart` /
+  :func:`vsdx.kit.erd.erd_from_models` /
+  :func:`vsdx.kit.process.build_process_map` /
+  :func:`vsdx.kit.swim_lanes.build_swim_lane_diagram`. No new
+  diagram logic ships in this commit.
+- **Workbook-source tolerance** — accepts a filesystem path
+  (``str`` / :class:`os.PathLike`), an open binary file-like, or a
+  pre-loaded ``xlsx.Workbook``. Path inputs are opened in
+  ``read_only=True, data_only=True`` mode so cached formula values
+  surface as plain Python scalars.
+- **Header-row fuzz tolerance** — column lookups are
+  case-insensitive and whitespace-tolerant; default-named optional
+  columns absent from the header silently skip; explicitly-named
+  missing columns raise a scoped :class:`ValueError` that names
+  both the requested column and the headers actually present.
+- **Two-sheet layouts** — ``process-map`` and ``swim-lane`` accept
+  separate ``steps_sheet`` / ``flows_sheet`` (and
+  ``lanes_sheet`` for swim-lane); single-sheet usage with no flows
+  sheet falls back to the kit's auto-sequential wiring.
+- **Public re-exports** —
+  :func:`~vsdx.kit.from_workbook.diagram_from_xlsx`,
+  :data:`~vsdx.kit.from_workbook.DIAGRAM_KINDS`, and every
+  ``KIND_*`` / ``*_DEFAULT_*_COL`` constant are reachable from
+  :mod:`vsdx.kit`.
+>>>>>>> 8ac63259 (feat(vsdx-kit): diagram_from_xlsx — workbook → diagram dispatcher (#136))
 
 ### Added — floor-plan template kit (#127)
 
