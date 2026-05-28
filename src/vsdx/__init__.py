@@ -112,6 +112,14 @@ from vsdx.layered_view import (
     LayeredViewRenderer,
     load_layered_view,
 )
+from vsdx.layout import (
+    LAYOUT_KIND_FORCE_DIRECTED,
+    LAYOUT_KIND_GRID,
+    LAYOUT_KIND_HIERARCHY,
+    LAYOUT_KIND_RADIAL,
+    LAYOUT_KINDS,
+    LayoutReport,
+)
 from vsdx.layers import Layer, Layers, ShapeLayers
 from vsdx.master import Master, Masters
 from vsdx.page import Page, Pages
@@ -208,10 +216,16 @@ __all__ = [
     "InfiniteLine",
     "Inches",
     "InkStroke",
+    "LAYOUT_KIND_FORCE_DIRECTED",
+    "LAYOUT_KIND_GRID",
+    "LAYOUT_KIND_HIERARCHY",
+    "LAYOUT_KIND_RADIAL",
+    "LAYOUT_KINDS",
     "Layer",
     "LayeredView",
     "LayeredViewRenderer",
     "Layers",
+    "LayoutReport",
     "Length",
     "LineTo",
     "Master",

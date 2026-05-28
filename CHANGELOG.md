@@ -6,6 +6,31 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — auto-layout algorithms (#50)
+
+- **`Page.layout(kind, **kwargs)`** — mutate every non-connector
+  shape's ``PinX`` / ``PinY`` in place using one of four pure-Python
+  algorithms. Returns a :class:`vsdx.LayoutReport` carrying
+  ``shapes_moved``, ``layout_kind``, post-layout ``bounding_box``,
+  and (for ``"force-directed"``) ``iterations``.
+- **`"hierarchy"`** — Reingold-Tilford-style tidy-tree layout. Roots
+  are nodes with no incoming connector edge; *direction* picks any of
+  ``"top-to-bottom"`` / ``"bottom-to-top"`` / ``"left-to-right"`` /
+  ``"right-to-left"``; *spacing* sets the per-level gap. Multiple
+  disjoint trees stack side-by-side on the cross axis.
+- **`"grid"`** — N-column row-major grid; *cols* defaults to
+  ``ceil(sqrt(shape_count))`` for an as-square-as-possible grid.
+- **`"radial"`** — concentric rings around *center_shape* (or the
+  highest-degree node when omitted); ring index = BFS distance over
+  the connector graph; ring ``k`` is at radius ``k * spacing``.
+- **`"force-directed"`** — Fruchterman-Reingold spring embedder with
+  a deterministic Fibonacci-spiral seed (two runs over the same shape
+  order produce the same final layout). *iterations* (default ``100``)
+  and *repulsion* (default ``1000``) control convergence.
+- Connector endpoints follow anchor pins via existing glue — call
+  :meth:`Connector.reroute` after layout to snap saved
+  ``Begin*`` / ``End*`` cells to the new positions.
+
 ### Added — layered diagrams: logical / physical / network views (#132)
 
 - **`Page.add_layered_view(layers=[...])`** — return a

@@ -951,6 +951,47 @@ class Page(PartElementProxy):
         )
         return InkStroke(trace, ink_part.ink)
 
+    # -- auto-layout ----------------------------------------------------
+
+    def layout(self, kind: str, **kwargs):
+        """Auto-layout this page's shapes — see :mod:`vsdx.layout`.
+
+        Four layout kinds are supported:
+
+        * ``"hierarchy"`` — Reingold-Tilford-style tree, oriented by the
+          *direction* keyword (default ``"top-to-bottom"``).
+        * ``"grid"`` — N-column row-major grid; *cols* defaults to
+          ``ceil(sqrt(shape_count))``.
+        * ``"radial"`` — concentric rings around a *center_shape* (or
+          the highest-degree node when omitted).
+        * ``"force-directed"`` — Fruchterman-Reingold spring embedder;
+          *iterations* (default ``100``) and *repulsion* (default
+          ``1000``) tune convergence.
+
+        Common keywords:
+
+        * ``spacing`` — float in inches; meaning depends on kind
+          (cross-axis gap for hierarchy, inter-cell gap for grid, ring
+          radius step for radial, frame-size factor for force-directed).
+        * ``origin`` — ``(x, y)`` tuple in inches anchoring the laid-out
+          cluster; defaults to ``(1.0, 1.0)``.
+
+        Returns a :class:`vsdx.layout.LayoutReport` with the moved-count,
+        kind, and post-layout bounding box for introspection. Connector
+        shapes are skipped by the layout pass — their endpoints follow
+        the anchor pins via the existing glue (call
+        :meth:`vsdx.shapes.connector.Connector.reroute` after layout to
+        snap saved ``Begin*`` / ``End*`` cells to the new positions).
+
+        See :mod:`vsdx.layout` for the kind-decision tree and full
+        algorithm notes.
+
+        .. versionadded:: 0.4.0
+        """
+        from vsdx.layout import layout as _layout
+
+        return _layout(self, kind, **kwargs)
+
     # -- diagram lint ---------------------------------------------------
 
     def lint(
