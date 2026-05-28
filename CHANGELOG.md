@@ -6,6 +6,28 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — fishbone / Ishikawa template kit (#129)
+
+- **`vsdx.kit.fishbone.build_fishbone`** — author a cause-and-effect
+  fishbone (Ishikawa) diagram from a ``problem`` string and a
+  ``categories`` mapping of *category name* → *sub-causes*. Returns a
+  fully-formed :class:`~vsdx.document.VisioDocument` ready to save.
+- **Layout** — landscape page with a horizontal spine, the problem
+  statement boxed at the right end (the head of the fish), and
+  category branches at 60° alternating top / bottom. Sub-causes hang
+  off each branch as short horizontal whisker segments parallel to
+  the spine, evenly distributed along the diagonal.
+- **Defaults** — when ``categories`` is omitted the canonical 6Ms
+  schema is used (People, Process, Product, Technology, Environment,
+  Measurement). Exposed as
+  :data:`~vsdx.kit.fishbone.FISHBONE_DEFAULT_CATEGORIES`. Arbitrary
+  category keys are accepted; mapping insertion order controls
+  left-to-right placement and the top / bottom alternation.
+- **Public constants** —
+  :data:`~vsdx.kit.fishbone.FISHBONE_DEFAULT_CATEGORIES` and
+  :data:`~vsdx.kit.fishbone.FISHBONE_BRANCH_ANGLE_DEG` are re-exported
+  from :mod:`vsdx.kit`.
+
 ### Added — SIPOC + process-map template kits (#128)
 
 - **`vsdx.kit.process.build_sipoc`** — five-column SIPOC (Suppliers /

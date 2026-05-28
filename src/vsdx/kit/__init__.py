@@ -26,6 +26,9 @@ Available kits:
   table (issue #128).
 * :func:`vsdx.kit.process.build_process_map` — vertical flowchart
   with start / task / decision / end step kinds (issue #128).
+* :func:`vsdx.kit.fishbone.build_fishbone` — Ishikawa cause-and-effect
+  diagram with horizontal spine, alternating top / bottom category
+  branches at 60°, and parallel sub-cause whiskers (issue #129).
 
 The kit modules avoid third-party runtime deps so they remain
 import-light. The ``[kit]`` extra in ``pyproject.toml`` is reserved
@@ -39,6 +42,11 @@ kits grow optional dependencies.
 
 from __future__ import annotations
 
+from vsdx.kit.fishbone import (
+    FISHBONE_BRANCH_ANGLE_DEG,
+    FISHBONE_DEFAULT_CATEGORIES,
+    build_fishbone,
+)
 from vsdx.kit.process import (
     PROCESS_KIND_DECISION,
     PROCESS_KIND_END,
@@ -59,6 +67,8 @@ from vsdx.kit.swim_lanes import (
 )
 
 __all__ = [
+    "FISHBONE_BRANCH_ANGLE_DEG",
+    "FISHBONE_DEFAULT_CATEGORIES",
     "PROCESS_KIND_DECISION",
     "PROCESS_KIND_END",
     "PROCESS_KIND_START",
@@ -70,6 +80,7 @@ __all__ = [
     "SWIM_LANE_KIND_END",
     "SWIM_LANE_KIND_START",
     "SWIM_LANE_STEP_KINDS",
+    "build_fishbone",
     "build_process_map",
     "build_sipoc",
     "build_swim_lane_diagram",
