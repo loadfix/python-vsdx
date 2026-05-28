@@ -215,6 +215,7 @@ class Stencil:
         self,
         target: Union[str, "IO[bytes]"],
         strict: Optional[bool] = None,
+        reproducible: bool = False,
     ) -> None:
         """Write the stencil out to *target* (path or file-like).
 
@@ -230,8 +231,10 @@ class Stencil:
             :meth:`VisioDocument.save` for semantics. ``None``
             preserves the class the package was loaded with
             (``False`` for a fresh ``Stencil.new()``).
+        :param reproducible: deterministic-build shorthand — see
+            :meth:`VisioDocument.save` for semantics. ``[Added in 0.3.1]``
         """
-        self._doc.save(target, strict=strict)
+        self._doc.save(target, strict=strict, reproducible=reproducible)
 
 
 # ----------------------------------------------------------------------

@@ -82,6 +82,28 @@ doc = parse_xml(xml)
 assert isinstance(doc, CT_VisioDocument)
 ```
 
+## Reproducible builds
+
+`VisioDocument.save(path, reproducible=True)` produces a byte-identical
+`.vsdx` for byte-identical inputs across machines and runs:
+
+```python
+from vsdx import Visio
+
+doc = Visio()
+doc.pages.add_page()
+doc.save("out.vsdx", reproducible=True)
+```
+
+The flag stamps every zip-member with the fixed 1980-01-01 timestamp,
+emits members in sorted order, and normalises external file
+attributes — the three sources of cross-machine nondeterminism a
+plain wall-clock save does not eliminate. Use it for source-control-
+friendly diffs, fixture regeneration in test suites, and content-
+addressable artefact pipelines. The matching keyword is also accepted
+by the sibling `python-docx`, `python-pptx`, and `python-xlsx` parents
+so cross-format build pipelines share a single idiom (issue #150).
+
 ## Round-trip support
 
 Visio's `.vsdx` is also an OPC zip, so the cross-monorepo round-trip

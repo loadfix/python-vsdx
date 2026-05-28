@@ -350,6 +350,7 @@ class VisioDocument(PartElementProxy):
         target: Union[str, IO[bytes]],
         password: Optional[str] = None,
         strict: Optional[bool] = None,
+        reproducible: bool = False,
     ) -> None:
         """Write the document to *target* (path or file-like).
 
@@ -373,8 +374,21 @@ class VisioDocument(PartElementProxy):
         - ``True`` — emit a Strict package regardless of source.
         - ``False`` — emit a Transitional package regardless of source.
 
+        ``reproducible=True`` is the deterministic-build shorthand
+        (issue #150). Every zip-member is stamped with the fixed
+        1980-01-01 timestamp, member writes are sorted alphabetically,
+        and external file attributes are normalised so the saved
+        ``.vsdx`` is byte-identical for byte-identical inputs across
+        machines and runs. Composes with ``password`` — the inner
+        plaintext zip is built reproducibly before the encryption
+        wrapper is applied. The matching keyword is also accepted by
+        the sibling ``python-docx`` / ``python-pptx`` / ``python-xlsx``
+        parents.
+
         .. versionadded:: 0.3.0
            The *password* and *strict* parameters.
+        .. versionadded:: 0.3.1
+           The *reproducible* parameter (issue #150).
         """
         # Auto-resize containers whose ``auto_resize`` flag is set, so
         # the on-disk ``Width``/``Height`` reflect the current
@@ -396,7 +410,7 @@ class VisioDocument(PartElementProxy):
                 pass
 
         if password is None:
-            self._package.save(target, strict=strict)
+            self._package.save(target, strict=strict, reproducible=reproducible)
             return
 
         try:
@@ -408,7 +422,7 @@ class VisioDocument(PartElementProxy):
             ) from exc
 
         plain_buf = io.BytesIO()
-        self._package.save(plain_buf, strict=strict)
+        self._package.save(plain_buf, strict=strict, reproducible=reproducible)
         # -- never include the password in error messages; re-raise as a
         # -- generic EncryptedPackageError so the secret is not surfaced.
         try:
