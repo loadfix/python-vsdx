@@ -440,6 +440,80 @@ class VisioDocument(PartElementProxy):
         else:
             target.write(encrypted)
 
+    @classmethod
+    def from_plantuml(
+        cls,
+        path: Union[str, Any],
+        *,
+        page_width: Optional[float] = None,
+        page_height: Optional[float] = None,
+        page_name: Optional[str] = None,
+    ) -> VisioDocument:
+        """Parse a ``.puml`` / ``.plantuml`` file and return the rendered document.
+
+        PlantUML is the second-most-popular text-to-diagram syntax (after
+        Mermaid). This classmethod is a convenience wrapper around
+        :func:`vsdx.kit.from_plantuml.from_plantuml` — see that function's
+        docstring for the supported syntax subset, layout policy, and
+        out-of-scope constructs.
+
+        :param path: filesystem path to a PlantUML source file.
+        :param page_width: explicit page width in inches; default depends
+            on the detected diagram kind.
+        :param page_height: explicit page height in inches; default
+            depends on diagram kind.
+        :param page_name: optional ``@NameU`` for the rendered page.
+
+        :returns: a fully-formed :class:`VisioDocument` ready to
+            :meth:`save`.
+
+        .. versionadded:: 0.4.0
+        """
+        from vsdx.kit.from_plantuml import from_plantuml as _from_plantuml
+
+        return _from_plantuml(
+            path,
+            page_width=page_width,
+            page_height=page_height,
+            page_name=page_name,
+        )
+
+    @classmethod
+    def from_plantuml_string(
+        cls,
+        text: str,
+        *,
+        page_width: Optional[float] = None,
+        page_height: Optional[float] = None,
+        page_name: Optional[str] = None,
+    ) -> VisioDocument:
+        """Parse a PlantUML *text* string and return the rendered document.
+
+        Thin wrapper around
+        :func:`vsdx.kit.from_plantuml.from_plantuml_string`.
+
+        :param text: PlantUML source. May or may not be wrapped in
+            ``@startuml`` / ``@enduml`` — the fence is treated
+            permissively.
+        :param page_width: explicit page width in inches.
+        :param page_height: explicit page height in inches.
+        :param page_name: optional ``@NameU`` for the rendered page.
+
+        :returns: a fully-formed :class:`VisioDocument`.
+
+        .. versionadded:: 0.4.0
+        """
+        from vsdx.kit.from_plantuml import (
+            from_plantuml_string as _from_plantuml_string,
+        )
+
+        return _from_plantuml_string(
+            text,
+            page_width=page_width,
+            page_height=page_height,
+            page_name=page_name,
+        )
+
     @staticmethod
     def open(
         source: Union[str, IO[bytes]],

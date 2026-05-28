@@ -6,6 +6,26 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — PlantUML import (#124)
+
+- **`VisioDocument.from_plantuml(path)`** /
+  **`VisioDocument.from_plantuml_string(text)`** — convert a
+  ``.puml`` / ``.plantuml`` file (or raw source string) into a
+  rendered :class:`~vsdx.document.VisioDocument`. The supported
+  PlantUML subset covers: ``@startuml`` / ``@enduml`` framing;
+  activity diagrams (``start`` / ``stop`` / ``:Action;`` /
+  ``if`` / ``else`` / ``endif``); component diagrams
+  (``[Component]`` / ``() Interface`` / ``-->`` / ``..>``); and
+  use-case diagrams (``actor`` / ``usecase``). Activity diagrams
+  flow top-down on a single vertical centreline; component / use-
+  case diagrams use a four-column free grid. Sequence / class /
+  deployment / state diagrams are deferred as future work — the
+  parser quietly skips lines it does not recognise so a mixed
+  source still renders the supported subset rather than failing
+  closed. Pure-Python parser, no third-party dependency, no Java
+  jar required. Implemented under :mod:`vsdx.kit.from_plantuml`
+  and re-exported from :mod:`vsdx.kit`.
+
 ### Added — high-level diagram pattern factories (#52)
 
 - **`vsdx.kit.patterns.aws_three_tier`** — author an AWS-style

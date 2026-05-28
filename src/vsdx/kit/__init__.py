@@ -101,6 +101,14 @@ from vsdx.kit.floor_plan import (
     UNIT_TOKENS,
     build_floor_plan,
 )
+from vsdx.kit.from_plantuml import (
+    PLANTUML_DIAGRAM_KINDS,
+    PLANTUML_KIND_ACTIVITY,
+    PLANTUML_KIND_COMPONENT,
+    PLANTUML_KIND_EMPTY,
+    from_plantuml,
+    from_plantuml_string,
+)
 from vsdx.kit.from_workbook import (
     DEFAULT_FLOWS_SHEET,
     DEFAULT_LANES_SHEET,
@@ -220,6 +228,10 @@ __all__ = [
     "ORG_CHART_DEFAULT_PHOTO_COL",
     "ORG_CHART_DEFAULT_TEAM_COL",
     "ORG_CHART_DEFAULT_TITLE_COL",
+    "PLANTUML_DIAGRAM_KINDS",
+    "PLANTUML_KIND_ACTIVITY",
+    "PLANTUML_KIND_COMPONENT",
+    "PLANTUML_KIND_EMPTY",
     "PROCESS_DEFAULT_FROM_COL",
     "PROCESS_DEFAULT_KIND_COL",
     "PROCESS_DEFAULT_LANE_COL",
@@ -253,6 +265,8 @@ __all__ = [
     "build_sipoc",
     "build_swim_lane_diagram",
     "diagram_from_xlsx",
+    "from_plantuml",
+    "from_plantuml_string",
     "erd_from_models",
     "erd_from_sql",
     "gantt_chart",
