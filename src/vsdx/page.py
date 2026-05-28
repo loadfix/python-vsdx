@@ -390,6 +390,9 @@ class Page(PartElementProxy):
         source_point: "Optional[ConnectionPoint]" = None,
         target_point: "Optional[ConnectionPoint]" = None,
         connector_master: str = "Dynamic connector",
+        routing: "Optional[str]" = None,
+        avoid_shapes: bool = False,
+        jump_style: str = "none",
     ) -> "Connector":
         """Drop a connector shape linking *source_shape* to *target_shape*.
 
@@ -475,7 +478,116 @@ class Page(PartElementProxy):
             from_cell="EndX",
             to_cell=target_to_cell,
         )
+
+        if routing is not None:
+            from vsdx.routing import route_connector
+
+            route_connector(
+                conn,
+                self,
+                routing=routing,
+                avoid_shapes=avoid_shapes,
+                jump_style=jump_style,
+            )
         return conn
+
+    def add_connector(
+        self,
+        from_shape: "Shape",
+        to_shape: "Shape",
+        routing: "Optional[str]" = None,
+        avoid_shapes: bool = False,
+        jump_style: str = "none",
+        source_point: "Optional[ConnectionPoint]" = None,
+        target_point: "Optional[ConnectionPoint]" = None,
+        connector_master: str = "Dynamic connector",
+    ) -> "Connector":
+        """Add a dynamic connector — page-level alias for :meth:`connect`.
+
+        Provided so the most common authoring spelling reads
+        symmetrically with the autoshape spelling
+        (``page.add_shape("Rectangle", ...)`` ↔
+        ``page.add_connector(from_shape, to_shape, routing=...)``).
+
+        :param from_shape: source-side anchor shape.
+        :param to_shape: target-side anchor shape.
+        :param routing: optional auto-routing mode — ``"right-angle"``,
+            ``"straight"`` (default behaviour when ``None``), or
+            ``"curved"``. See :mod:`vsdx.routing`.
+        :param avoid_shapes: when ``True`` and *routing* is
+            right-angle / curved, route around other shapes on the
+            page.
+        :param jump_style: ``"arc"`` / ``"gap"`` / ``"none"`` — how
+            to render crossings of pre-existing connector polylines.
+        :param source_point: forwarded to :meth:`connect`.
+        :param target_point: forwarded to :meth:`connect`.
+        :param connector_master: forwarded to :meth:`connect`.
+
+        .. versionadded:: 0.3.0
+        """
+        return self.connect(
+            source_shape=from_shape,
+            target_shape=to_shape,
+            source_point=source_point,
+            target_point=target_point,
+            connector_master=connector_master,
+            routing=routing,
+            avoid_shapes=avoid_shapes,
+            jump_style=jump_style,
+        )
+
+    def reroute_connectors(
+        self,
+        routing: str = "right-angle",
+        avoid_shapes: bool = True,
+        jump_style: str = "none",
+    ) -> int:
+        """Recompute the polyline of every connector on this page.
+
+        Iterates the page's :class:`ShapeTree`, snaps each
+        :class:`~vsdx.shapes.connector.Connector`'s endpoints to its
+        current glue (via :meth:`Connector.reroute`), and applies the
+        :mod:`vsdx.routing` engine with the given mode and obstacle
+        flag. Returns the number of connectors successfully re-routed.
+
+        :param routing: routing mode passed to
+            :func:`vsdx.routing.route_connector`. Defaults to
+            ``"right-angle"`` — the typical use case after a layout
+            pass that has moved several shapes.
+        :param avoid_shapes: when ``True`` (default), routes around
+            every non-anchor shape on the page.
+        :param jump_style: ``"arc"`` / ``"gap"`` / ``"none"`` — how
+            to render this routing pass's connector crossings.
+            Crossings are only computed against connectors *already*
+            re-routed in this pass — connectors processed later
+            cross-hop the earlier ones, not the other way around.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.routing import route_connector
+        from vsdx.shapes.connector import Connector
+
+        count = 0
+        already_routed: list[Connector] = []
+        for shape in list(self.shapes):
+            if not isinstance(shape, Connector):
+                continue
+            shape.reroute()
+            try:
+                route_connector(
+                    shape,
+                    self,
+                    routing=routing,
+                    avoid_shapes=avoid_shapes,
+                    jump_style=jump_style,
+                    other_connectors=list(already_routed),
+                )
+            except ValueError:
+                # Invalid mode / style — surface to the caller.
+                raise
+            already_routed.append(shape)
+            count += 1
+        return count
 
     # -- container shapes ----------------------------------------------
 

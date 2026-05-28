@@ -31,6 +31,48 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   :meth:`Connector.reroute` after layout to snap saved
   ``Begin*`` / ``End*`` cells to the new positions.
 
+### Added — connector auto-routing with obstacle avoidance (#53)
+
+- **`Page.add_connector(from_shape, to_shape, routing="right-angle",
+  avoid_shapes=True, jump_style="arc")`** — drop a connector with
+  a Manhattan polyline that bends around other shapes. ``routing``
+  accepts ``"right-angle"`` / ``"straight"`` / ``"curved"``;
+  ``jump_style`` accepts ``"arc"`` / ``"gap"`` / ``"none"``.
+- **`Page.reroute_connectors(routing="right-angle",
+  avoid_shapes=True, jump_style="none")`** — bulk re-route every
+  connector on the page after a layout pass. Returns the number
+  of connectors processed.
+- **`Connector.reroute(routing=..., avoid_shapes=..., jump_style=...)`** —
+  re-snaps endpoints to current glue *and* (optionally) runs the
+  auto-router so the shape's polyline follows the new geometry.
+- **`vsdx.routing`** — public module exposing
+  :func:`compute_route` (Manhattan A* with turn penalty),
+  :func:`compute_jumps` (segment-crossing detection),
+  :func:`route_connector` (page-aware orchestration), and
+  :func:`apply_route_to_connector` (Geometry-section materialiser).
+  Pure Python — no third-party dependencies. Tunables
+  ``GRID_RESOLUTION``, ``OBSTACLE_PADDING``, ``TURN_PENALTY``,
+  ``JUMP_ARC_HEIGHT``, ``JUMP_GAP_HALFWIDTH`` are exposed at
+  module-level for callers / tests.
+- The connector's polyline is written as a ``<Section
+  N="Geometry">`` with ``MoveTo`` / ``LineTo`` / ``ArcTo`` rows
+  shape-local to the connector's pin, so a Visio-desktop reload
+  sees the same path the author saw.
+- Routing mode decision tree — ``routing="right-angle"`` is the
+  default for diagrams that benefit from clean orthogonal paths
+  (flowcharts, network diagrams, AWS architecture); ``"straight"``
+  for floor plans / scatter plots where a direct line is clearer;
+  ``"curved"`` for organisational charts where soft corners read
+  better than sharp turns. Set ``avoid_shapes=False`` to skip
+  obstacle painting (faster, but the polyline may run through
+  other shapes — appropriate when shapes are sparse or never
+  overlap the connector's natural path). Set
+  ``jump_style="arc"`` only on the *second* (and later) connector
+  in a layout pass — the first connector has nothing to jump
+  over.
+- See ``vsdx.routing`` module docstring for the full algorithm
+  description.
+
 ### Added — layered diagrams: logical / physical / network views (#132)
 
 - **`Page.add_layered_view(layers=[...])`** — return a

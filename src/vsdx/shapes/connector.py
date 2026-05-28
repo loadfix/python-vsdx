@@ -223,7 +223,12 @@ class Connector(TextShape):
 
     # -- route recomputation ------------------------------------------------
 
-    def reroute(self) -> None:
+    def reroute(
+        self,
+        routing: Optional[str] = None,
+        avoid_shapes: bool = False,
+        jump_style: str = "none",
+    ) -> None:
         """Recompute the connector's endpoint coordinates from current glue.
 
         For the dynamic-connector default (``RouteStyle`` absent or
@@ -237,6 +242,14 @@ class Connector(TextShape):
         :meth:`Shape.set_geometry` can call :meth:`reroute` to snap the
         connector to the new positions without rebuilding the
         ``<Connect>`` entries.
+
+        Passing ``routing`` (one of ``"right-angle"``, ``"straight"``,
+        ``"curved"``) additionally runs the auto-router from
+        :mod:`vsdx.routing`, materialising the connector's polyline as
+        a ``<Section N="Geometry">`` path. *avoid_shapes* paints other
+        shapes on the page as obstacles; *jump_style* (``"arc"`` /
+        ``"gap"`` / ``"none"``) controls how the new route renders
+        crossings of pre-existing connector polylines.
 
         No-op when either endpoint is unglued.
 
@@ -261,6 +274,21 @@ class Connector(TextShape):
                 wx, wy = float(tgt.pin_x), float(tgt.pin_y)
             self.end_x = wx
             self.end_y = wy
+
+        if routing is not None:
+            from vsdx.page import Page
+            from vsdx.routing import route_connector
+
+            tree = self._parent
+            page = getattr(tree, "_parent", None)
+            if isinstance(page, Page):
+                route_connector(
+                    self,
+                    page,
+                    routing=routing,
+                    avoid_shapes=avoid_shapes,
+                    jump_style=jump_style,
+                )
 
 
 # -- local copies of the base module helpers (private to this file) ---------

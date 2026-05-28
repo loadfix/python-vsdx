@@ -328,6 +328,9 @@ class ShapeTree(ParentedElementProxy):
         self,
         from_shape: Shape,
         to_shape: Shape,
+        routing: Optional[str] = None,
+        avoid_shapes: bool = False,
+        jump_style: str = "none",
     ) -> Connector:
         """Add a dynamic connector between *from_shape* and *to_shape*.
 
@@ -335,6 +338,29 @@ class ShapeTree(ParentedElementProxy):
         ``BeginX`` / ``EndX`` / ``BeginY`` / ``EndY`` cells to the two
         anchor-shape pins, and adds two ``<Connect>`` entries to the
         page's ``<Connects>`` element.
+
+        :param routing: optional auto-routing mode — ``"right-angle"``
+            (Manhattan A* path with obstacle avoidance), ``"straight"``
+            (no geometry section, Visio renders a straight line at
+            display time), or ``"curved"`` (Manhattan path with arc
+            corners). When ``None`` (default) no Geometry section is
+            authored — the connector renders as a straight line. See
+            :mod:`vsdx.routing` for the algorithm.
+        :param avoid_shapes: when ``True`` and *routing* is
+            ``"right-angle"`` / ``"curved"``, the auto-router routes
+            *around* every other shape on the page; ``False`` skips
+            obstacle painting (faster, but the polyline may run
+            through other shapes).
+        :param jump_style: ``"arc"`` / ``"gap"`` / ``"none"`` — how to
+            render this connector's crossings over pre-existing
+            connector polylines. ``"none"`` (default) ignores
+            crossings.
+
+        .. versionchanged:: 0.3.0
+            Added the *routing*, *avoid_shapes*, and *jump_style*
+            keyword arguments. Default behaviour (no kwargs) matches
+            pre-0.3.0 — the connector is authored as a straight line
+            with no Geometry section, exactly as before.
         """
         shape_el = self._element.shapes_element.add_shape(
             master_name_u=VS_SHAPE_TYPE.DYNAMIC_CONNECTOR.value
@@ -358,6 +384,17 @@ class ShapeTree(ParentedElementProxy):
             from_cell="EndX",
             to_cell="PinX",
         )
+
+        if routing is not None:
+            from vsdx.routing import route_connector
+
+            route_connector(
+                conn,
+                page,
+                routing=routing,
+                avoid_shapes=avoid_shapes,
+                jump_style=jump_style,
+            )
         return conn
 
     def group(self, shapes: "list[Shape]") -> GroupShape:

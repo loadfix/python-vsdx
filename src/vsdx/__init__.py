@@ -124,6 +124,18 @@ from vsdx.layers import Layer, Layers, ShapeLayers
 from vsdx.master import Master, Masters
 from vsdx.page import Page, Pages
 from vsdx.print_setup import PRINT_ORIENTATION, PrintSetup
+from vsdx.routing import (
+    JUMP_ARC,
+    JUMP_GAP,
+    JUMP_NONE,
+    ROUTING_CURVED,
+    ROUTING_RIGHT_ANGLE,
+    ROUTING_STRAIGHT,
+    apply_route_to_connector,
+    compute_jumps,
+    compute_route,
+    route_connector,
+)
 from vsdx.shape_data import (
     PROPERTY_TYPE_BOOLEAN,
     PROPERTY_TYPE_CURRENCY,
@@ -205,6 +217,16 @@ __all__ = [
     "GRAPHIC_KIND_DATA_BAR",
     "GRAPHIC_KIND_ICON_SET",
     "GRAPHIC_KIND_TEXT_CALLOUT",
+    "JUMP_ARC",
+    "JUMP_GAP",
+    "JUMP_NONE",
+    "ROUTING_CURVED",
+    "ROUTING_RIGHT_ANGLE",
+    "ROUTING_STRAIGHT",
+    "apply_route_to_connector",
+    "compute_jumps",
+    "compute_route",
+    "route_connector",
     "FontVariation",
     "Geometries",
     "Geometry",
