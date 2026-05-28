@@ -60,6 +60,37 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   subsequent declarations).
 - **`DotParseError`** exception carries the offending line number so
   callers can surface a useful pointer.
+### Added — Mermaid flowchart import (#123)
+
+- **`VisioDocument.from_mermaid(path)`** /
+  **`VisioDocument.from_mermaid_string(text)`** — author a Visio
+  drawing from a Mermaid ``flowchart`` / ``graph`` source. Supported
+  subset: ``TD`` / ``LR`` / ``BT`` / ``RL`` / ``TB`` direction headers;
+  ``[Rectangle]`` / ``(Rounded)`` / ``((Circle))`` / ``{Diamond}``
+  node shapes; ``-->`` / ``---`` / ``-.->`` edges with optional
+  ``|label|`` text and chained ``A --> B --> C`` decomposition;
+  ``subgraph Title ... end`` blocks rendered as labelled
+  :class:`~vsdx.container.Container` shapes. Markdown fences
+  (```` ```mermaid ````) and ``style`` / ``classDef`` / ``click`` /
+  ``linkStyle`` directives are silently stripped.
+- **Layout** — nodes drop onto a fixed 5-column grid in declaration
+  order (configurable via the *columns* kwarg); the connector
+  auto-routing engine draws the edges in right-angle mode. Sugiyama
+  layered layout is **not** implemented — callers needing tighter
+  placement can post-process via :func:`vsdx.layout.layout`
+  (``"hierarchy"`` mode) or :meth:`Page.reroute_connectors`.
+- **Pure-Python parser** — no ``pyparsing`` / ``lark`` dependency.
+  Public surface (:func:`vsdx.mermaid.parse_mermaid`,
+  :func:`vsdx.mermaid.build_from_mermaid`, the four AST dataclasses,
+  the direction / node-shape / edge-style token constants, and the
+  :class:`vsdx.mermaid.MermaidParseError` raised on malformed input)
+  lets callers drive the AST directly when they don't need the
+  built-in builder.
+- **Out of scope** (future work) — sequence diagrams, Gantt charts,
+  class diagrams, state diagrams, ER diagrams, pie charts, and the
+  rest of the non-flowchart Mermaid family. These already have
+  matching kit builders (e.g. :func:`vsdx.kit.patterns.sequence_diagram`)
+  for callers reaching for them today.
 
 ### Added — high-level diagram pattern factories (#52)
 

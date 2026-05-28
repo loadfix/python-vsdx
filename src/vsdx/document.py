@@ -515,6 +515,80 @@ class VisioDocument(PartElementProxy):
             page_name=page_name,
         )
 
+    # -- Mermaid import --------------------------------------------------
+
+    @classmethod
+    def from_mermaid(
+        cls,
+        path: Union[str, "os.PathLike[str]"],
+        *,
+        columns: int = 5,
+        page_name: str = "Mermaid",
+    ) -> VisioDocument:
+        """Author a :class:`VisioDocument` from a Mermaid ``.mmd`` file.
+
+        Reads *path* in UTF-8 and delegates to
+        :func:`vsdx.mermaid.build_from_mermaid`. The supported Mermaid
+        subset is documented in :mod:`vsdx.mermaid`; flowchart /
+        graph syntax with rectangle / rounded / circle / diamond
+        shapes, solid / dashed / plain edges, optional ``|label|``
+        edge labels, and ``subgraph`` blocks all map across.
+
+        Sequence diagrams, Gantt charts, class diagrams and the other
+        Mermaid syntaxes are out of scope for this entry point —
+        callers reach for them via dedicated kit builders (e.g.
+        :func:`vsdx.kit.patterns.sequence_diagram`).
+
+        :param path: path to a ``.mmd`` file (or any text file
+            carrying a Mermaid flowchart source).
+        :param columns: grid auto-layout column count. Defaults to
+            ``5`` — wide enough to show typical 10-20 node graphs
+            without wrapping into too many rows, narrow enough that
+            the page width caps at the standard letter size for most
+            inputs.
+        :param page_name: rendered name of the produced page.
+        :raises vsdx.mermaid.MermaidParseError: when the source can't
+            be parsed as a flowchart in the supported subset.
+
+        .. versionadded:: 0.4.0
+        """
+        from vsdx.mermaid import build_from_mermaid
+
+        return build_from_mermaid(
+            path, columns=columns, page_name=page_name
+        )
+
+    @classmethod
+    def from_mermaid_string(
+        cls,
+        text: str,
+        *,
+        columns: int = 5,
+        page_name: str = "Mermaid",
+    ) -> VisioDocument:
+        """Author a :class:`VisioDocument` from an inline Mermaid string.
+
+        Sister classmethod of :meth:`from_mermaid`; reads from an
+        in-memory ``str`` rather than a file. Useful when the Mermaid
+        source is templated, fetched over HTTP, or pulled out of a
+        Markdown ```mermaid`` fence (the leading / trailing fence is
+        stripped automatically).
+
+        :param text: the raw Mermaid flowchart source.
+        :param columns: grid auto-layout column count. See
+            :meth:`from_mermaid`.
+        :param page_name: rendered name of the produced page.
+        :raises vsdx.mermaid.MermaidParseError: when *text* can't be
+            parsed as a flowchart in the supported subset.
+
+        .. versionadded:: 0.4.0
+        """
+        from vsdx.mermaid import build_from_mermaid
+
+        return build_from_mermaid(
+            text, columns=columns, page_name=page_name
+        )
+
     @staticmethod
     def open(
         source: Union[str, IO[bytes]],
