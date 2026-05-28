@@ -43,6 +43,7 @@ Repository = "https://github.com/loadfix/python-vsdx.git"
 [project.optional-dependencies]
 dev = [
     "behave>=1.2.6",
+    "hypothesis>=6.100.0",
     "pytest>=8.4.0",
     "pytest-cov",
     "pytest-xdist",
