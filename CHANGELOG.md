@@ -28,6 +28,32 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   :data:`~vsdx.kit.fishbone.FISHBONE_BRANCH_ANGLE_DEG` are re-exported
   from :mod:`vsdx.kit`.
 
+### Added — org-chart template kit (#122)
+
+- **`vsdx.kit.org_chart.build_org_chart`** — author a hierarchical
+  org-chart diagram from a list of ``{"name", "title", "manager",
+  ...}`` employee dicts. Each employee renders as a labelled rectangle
+  (name + title on two lines); reporting lines emit as right-angle
+  dynamic connectors (issue #53) and the resulting tree is laid out
+  via :meth:`Page.layout("hierarchy") <vsdx.page.Page.layout>` (issue
+  #50). Roots (employees with no ``manager``) sit at the top, direct
+  reports fan out underneath, disjoint trees stack side-by-side.
+- **`vsdx.kit.org_chart.build_org_chart_from_csv`** — same builder
+  driven by a CSV file. The default ``name`` / ``title`` / ``manager``
+  / ``photo`` / ``team`` column names are overridable via the
+  ``*_col`` kwargs so existing HR-export schemas plug in without a
+  pre-processing step. Optional columns can be omitted from the
+  header entirely.
+- **Optional metadata** — ``photo`` (URL or local path) and ``team``
+  values are recorded on each box's
+  :attr:`~vsdx.shapes.base.Shape.data` proxy as ``"Photo"`` /
+  ``"Team"`` shape-data properties so a later data-graphics pass /
+  Visio's "Pictures" widget can pick them up.
+- **Validation** — empty rosters, blank names, duplicate names,
+  unknown manager references, self-management, and manager-graph
+  cycles all raise ``ValueError`` with a precise message before any
+  shapes are emitted.
+
 ### Added — SIPOC + process-map template kits (#128)
 
 - **`vsdx.kit.process.build_sipoc`** — five-column SIPOC (Suppliers /

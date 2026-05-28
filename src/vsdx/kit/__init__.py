@@ -29,6 +29,10 @@ Available kits:
 * :func:`vsdx.kit.fishbone.build_fishbone` — Ishikawa cause-and-effect
   diagram with horizontal spine, alternating top / bottom category
   branches at 60°, and parallel sub-cause whiskers (issue #129).
+* :func:`vsdx.kit.org_chart.build_org_chart` /
+  :func:`vsdx.kit.org_chart.build_org_chart_from_csv` —
+  hierarchical org charts authored from a programmatic roster or a
+  CSV file (issue #122).
 
 The kit modules avoid third-party runtime deps so they remain
 import-light. The ``[kit]`` extra in ``pyproject.toml`` is reserved
@@ -46,6 +50,15 @@ from vsdx.kit.fishbone import (
     FISHBONE_BRANCH_ANGLE_DEG,
     FISHBONE_DEFAULT_CATEGORIES,
     build_fishbone,
+)
+from vsdx.kit.org_chart import (
+    DEFAULT_MANAGER_COL,
+    DEFAULT_NAME_COL,
+    DEFAULT_PHOTO_COL,
+    DEFAULT_TEAM_COL,
+    DEFAULT_TITLE_COL,
+    build_org_chart,
+    build_org_chart_from_csv,
 )
 from vsdx.kit.process import (
     PROCESS_KIND_DECISION,
@@ -67,6 +80,11 @@ from vsdx.kit.swim_lanes import (
 )
 
 __all__ = [
+    "DEFAULT_MANAGER_COL",
+    "DEFAULT_NAME_COL",
+    "DEFAULT_PHOTO_COL",
+    "DEFAULT_TEAM_COL",
+    "DEFAULT_TITLE_COL",
     "FISHBONE_BRANCH_ANGLE_DEG",
     "FISHBONE_DEFAULT_CATEGORIES",
     "PROCESS_KIND_DECISION",
@@ -81,6 +99,8 @@ __all__ = [
     "SWIM_LANE_KIND_START",
     "SWIM_LANE_STEP_KINDS",
     "build_fishbone",
+    "build_org_chart",
+    "build_org_chart_from_csv",
     "build_process_map",
     "build_sipoc",
     "build_swim_lane_diagram",
