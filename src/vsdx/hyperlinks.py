@@ -53,6 +53,7 @@ DocumentSheet ``<Cell N="HyperlinkBase">`` cell.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterator, List, Optional, Union
+from urllib.parse import quote
 
 from vsdx.shared import ParentedElementProxy
 
@@ -64,6 +65,10 @@ if TYPE_CHECKING:
 __all__ = [
     "Hyperlink",
     "HyperlinkCollection",
+    "build_aws_console_url",
+    "build_confluence_url",
+    "build_github_url",
+    "build_jira_url",
 ]
 
 
@@ -543,3 +548,186 @@ class HyperlinkCollection(ParentedElementProxy):
             d = _cell_v(row, "Description")
             descs.append(repr(d) if d else repr(row.get("N") or ""))
         return f"<HyperlinkCollection [{', '.join(descs)}]>"
+
+
+# ---------------------------------------------------------------------------
+# URL pattern builders — public helpers consumed by Shape.link_to_*
+#
+# These produce the canonical web-console URL for the given service/
+# resource combo. Kept module-level (rather than baked into Shape) so
+# callers writing ad-hoc tooling can reuse them without going through
+# a Shape proxy:
+#
+#     >>> from vsdx.hyperlinks import build_aws_console_url
+#     >>> build_aws_console_url(service="ec2", resource_id="i-abc",
+#     ...                       region="ap-southeast-2")
+#     'https://ap-southeast-2.console.aws.amazon.com/ec2/home?region=ap-southeast-2#Instances:instanceId=i-abc'
+#
+# The builders aim for "URL that opens the resource's detail page when
+# pasted into a browser logged into the right account / instance".
+# Service-specific deep-link patterns are best-effort — AWS / Atlassian
+# console URL formats drift over time. When a console reorganises,
+# update the builder rather than asking callers to construct the URL.
+#
+# .. versionadded:: 0.3.0
+# ---------------------------------------------------------------------------
+
+
+# AWS service code → (deep-link path template, resource fragment template).
+# Keyed on the service code Visio diagrams typically carry (matches the
+# ``service=`` kwarg on :meth:`Shape.link_to_aws_console`). Unmapped
+# services fall back to the service home page (no resource deep link).
+_AWS_DEEP_LINKS = {
+    # service: (path, fragment with {id})
+    "ec2": ("ec2/home", "Instances:instanceId={id}"),
+    "s3": ("s3/buckets/{id}", ""),
+    "lambda": ("lambda/home", "/functions/{id}"),
+    "rds": ("rds/home", "database:id={id};is-cluster=false"),
+    "dynamodb": ("dynamodb/home", "tables:selected={id}"),
+    "iam": ("iam/home", "/users/{id}"),
+    "vpc": ("vpc/home", "vpcs:VpcId={id}"),
+    "cloudwatch": ("cloudwatch/home", "logsV2:log-groups/log-group/{id}"),
+    "sqs": ("sqs/v2/home", "/queues/{id}"),
+    "sns": ("sns/v3/home", "/topic/{id}"),
+}
+
+
+def build_aws_console_url(
+    *,
+    service: str,
+    resource_id: Optional[str] = None,
+    region: Optional[str] = None,
+) -> str:
+    """Build an AWS console URL for *service* (and optionally a resource).
+
+    :param service: AWS service code — ``"ec2"``, ``"s3"``, ``"lambda"``,
+      ``"rds"``, ``"dynamodb"``, ``"iam"``, ``"vpc"``, ``"cloudwatch"``,
+      ``"sqs"``, ``"sns"``. Unknown services fall back to a generic
+      ``console.aws.amazon.com/<service>`` link with no resource deep
+      link.
+    :param resource_id: Optional resource identifier (instance-id /
+      bucket-name / function-name / table-name / ...). When supplied,
+      the URL navigates to the resource's detail page where AWS supports
+      it.
+    :param region: Optional AWS region (``"ap-southeast-2"`` etc). When
+      supplied the URL is prefixed with the regional console host
+      and a ``?region=`` query parameter; service home defaults to the
+      account's "last used" region otherwise.
+    :returns: A console URL safe to paste into a browser.
+
+    .. versionadded:: 0.3.0
+    """
+    host = (
+        f"{region}.console.aws.amazon.com"
+        if region
+        else "console.aws.amazon.com"
+    )
+    spec = _AWS_DEEP_LINKS.get(service.lower())
+    if spec is None:
+        # Unknown service: link to the service's home page.
+        return f"https://{host}/{service.lower()}/home" + (
+            f"?region={region}" if region else ""
+        )
+    path_template, fragment_template = spec
+    if resource_id is None or fragment_template == "":
+        # Either no resource deep link supported, or caller didn't pass
+        # one — fold the id into the path template (S3 buckets) or omit
+        # the fragment entirely.
+        path = path_template.format(id=resource_id or "")
+        url = f"https://{host}/{path}"
+        if region:
+            url += f"?region={region}"
+        return url
+    path = path_template
+    fragment = fragment_template.format(id=resource_id)
+    url = f"https://{host}/{path}"
+    if region:
+        url += f"?region={region}"
+    url += f"#{fragment}"
+    return url
+
+
+def build_github_url(
+    *,
+    repo: str,
+    file: Optional[str] = None,
+    line: Optional[int] = None,
+    branch: str = "main",
+) -> str:
+    """Build a github.com URL for *repo* (and optionally a file / line).
+
+    :param repo: ``"owner/repo"`` slug.
+    :param file: Optional path within the repo (``"src/main.py"``).
+      When omitted, the URL points at the repository root.
+    :param line: Optional 1-based line number. Ignored when *file* is
+      ``None``.
+    :param branch: Branch / ref to link against. Defaults to ``"main"``
+      since GitHub renamed master → main in 2020 and the AWS / k8s /
+      most modern repos honour the new default. Override for older
+      repos that still use ``"master"`` or for tag / SHA links.
+    :returns: A canonical github.com URL.
+
+    .. versionadded:: 0.3.0
+    """
+    base = f"https://github.com/{repo}"
+    if file is None:
+        return base
+    # GitHub URL form: /<owner>/<repo>/blob/<ref>/<path>[#L<line>]
+    url = f"{base}/blob/{branch}/{file.lstrip('/')}"
+    if line is not None:
+        url += f"#L{int(line)}"
+    return url
+
+
+def build_confluence_url(
+    *,
+    base_url: str,
+    space: str,
+    page: str,
+) -> str:
+    """Build a Confluence page URL.
+
+    :param base_url: Confluence site URL — ``"https://acme.atlassian.net/wiki"``
+      for Atlassian Cloud, ``"https://confluence.example.com"`` for
+      self-hosted Server / Data Center. Trailing slash is tolerated.
+    :param space: Space key (``"ENG"``, ``"DOCS"``, ...).
+    :param page: Page title. Spaces are URL-encoded.
+    :returns: A Confluence page URL using the ``display`` view path
+      that resolves both Atlassian Cloud and Server.
+
+    .. versionadded:: 0.3.0
+    """
+    base = base_url.rstrip("/")
+    encoded_page = quote(page, safe="")
+    return f"{base}/display/{space}/{encoded_page}"
+
+
+def build_jira_url(
+    *,
+    base_url: str,
+    project: str,
+    issue: Union[int, str],
+) -> str:
+    """Build a Jira issue URL.
+
+    :param base_url: Jira site URL — ``"https://acme.atlassian.net"``
+      for Atlassian Cloud, ``"https://jira.example.com"`` for
+      self-hosted Server / Data Center. Trailing slash is tolerated.
+    :param project: Project key (``"ABC"``, ``"PROJ"``, ...).
+    :param issue: Issue number (``123``) or full key (``"ABC-123"``).
+      Numbers are joined to *project* with ``"-"``; pre-formatted keys
+      pass through verbatim so the helper accepts both forms callers
+      might already have on hand.
+    :returns: A Jira issue URL of the form
+      ``<base_url>/browse/<PROJECT>-<NUMBER>``.
+
+    .. versionadded:: 0.3.0
+    """
+    base = base_url.rstrip("/")
+    if isinstance(issue, int):
+        key = f"{project}-{issue}"
+    else:
+        # Allow callers to pass a full key (``"ABC-123"``) or a bare
+        # numeric string (``"123"``).
+        key = issue if "-" in issue else f"{project}-{issue}"
+    return f"{base}/browse/{key}"

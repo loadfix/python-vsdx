@@ -22,10 +22,19 @@ BDD-style per project conventions. Covers:
 
 from __future__ import annotations
 
+import io
+
 import pytest
 
 import vsdx
-from vsdx.hyperlinks import Hyperlink, HyperlinkCollection
+from vsdx.hyperlinks import (
+    Hyperlink,
+    HyperlinkCollection,
+    build_aws_console_url,
+    build_confluence_url,
+    build_github_url,
+    build_jira_url,
+)
 from vsdx.oxml import nsdecls, parse_xml
 
 
@@ -506,3 +515,368 @@ class DescribeRepr:
         assert "Alpha" in r
         assert "a.com" in r
         assert "default" in r
+
+
+# ---------------------------------------------------------------------------
+# Issue #133 — Shape.add_hyperlink + pattern helpers
+# ---------------------------------------------------------------------------
+
+
+class DescribeShapeAddHyperlink:
+    def it_appends_a_hyperlink_with_url_and_label(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.add_hyperlink(
+            "https://example.com", label="Home page"
+        )
+        assert isinstance(h, Hyperlink)
+        assert h.address == "https://example.com"
+        assert h.description == "Home page"
+
+    def it_preserves_multiple_hyperlinks_per_shape(self) -> None:
+        # Visio supports multiple hyperlinks per shape; #133 acceptance
+        # demands we don't replace on a second call.
+        _, _, shape = _fresh_shape()
+        shape.add_hyperlink("https://a.com", label="A")
+        shape.add_hyperlink("https://b.com", label="B")
+        shape.add_hyperlink("https://c.com", label="C")
+        assert len(shape.hyperlinks) == 3
+        assert [h.description for h in shape.hyperlinks] == ["A", "B", "C"]
+
+    def it_supports_label_only_intra_document_jumps(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.add_hyperlink(
+            "", label="Jump to page 2", sub_address="Page-2"
+        )
+        assert h.sub_address == "Page-2"
+
+    def it_marks_default_when_default_true(self) -> None:
+        _, _, shape = _fresh_shape()
+        shape.add_hyperlink("https://a.com", label="A")
+        b = shape.add_hyperlink("https://b.com", label="B", default=True)
+        assert b.default is True
+        assert shape.hyperlinks["A"].default is False
+
+    def it_passes_new_window_through(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.add_hyperlink(
+            "https://a.com", label="A", new_window=True
+        )
+        assert h.new_window is True
+
+
+# ---------------------------------------------------------------------------
+# Describe URL pattern builders
+# ---------------------------------------------------------------------------
+
+
+class DescribeBuildAWSConsoleURL:
+    def it_builds_an_ec2_instance_url(self) -> None:
+        url = build_aws_console_url(
+            service="ec2",
+            resource_id="i-abc123",
+            region="ap-southeast-2",
+        )
+        assert "ap-southeast-2.console.aws.amazon.com" in url
+        assert "ec2/home" in url
+        assert "i-abc123" in url
+
+    def it_builds_a_regionless_service_home_when_no_region(self) -> None:
+        url = build_aws_console_url(service="ec2", resource_id="i-x")
+        assert url.startswith("https://console.aws.amazon.com/")
+        assert "i-x" in url
+
+    def it_routes_s3_buckets_to_the_path_template(self) -> None:
+        url = build_aws_console_url(service="s3", resource_id="my-bucket")
+        # S3 deep-links bake the bucket name into the path.
+        assert "/s3/buckets/my-bucket" in url
+
+    def it_falls_back_for_unknown_services(self) -> None:
+        url = build_aws_console_url(service="opensearch")
+        assert "opensearch/home" in url
+
+    def it_omits_resource_fragment_when_id_missing(self) -> None:
+        url = build_aws_console_url(service="ec2")
+        # No resource — no Instance fragment in the URL.
+        assert "instanceId" not in url
+
+    def it_handles_lambda_function_names(self) -> None:
+        url = build_aws_console_url(
+            service="lambda",
+            resource_id="my-func",
+            region="us-east-1",
+        )
+        assert "us-east-1.console.aws.amazon.com" in url
+        assert "my-func" in url
+
+
+class DescribeBuildGitHubURL:
+    def it_builds_a_repo_root_url(self) -> None:
+        assert (
+            build_github_url(repo="example/order-service")
+            == "https://github.com/example/order-service"
+        )
+
+    def it_builds_a_file_url_with_default_branch(self) -> None:
+        url = build_github_url(
+            repo="example/order-service", file="src/main.py"
+        )
+        assert url == (
+            "https://github.com/example/order-service/blob/main/src/main.py"
+        )
+
+    def it_builds_a_file_line_url(self) -> None:
+        url = build_github_url(
+            repo="example/order-service", file="src/main.py", line=42
+        )
+        assert url.endswith("/src/main.py#L42")
+
+    def it_honours_an_explicit_branch(self) -> None:
+        url = build_github_url(
+            repo="example/order-service",
+            file="src/main.py",
+            branch="develop",
+        )
+        assert "/blob/develop/src/main.py" in url
+
+    def it_strips_a_leading_slash_on_file(self) -> None:
+        url = build_github_url(
+            repo="example/order-service", file="/src/main.py"
+        )
+        assert "/blob/main/src/main.py" in url
+        assert "/blob/main//src/main.py" not in url
+
+
+class DescribeBuildConfluenceURL:
+    def it_builds_a_display_url(self) -> None:
+        url = build_confluence_url(
+            base_url="https://acme.atlassian.net/wiki",
+            space="ENG",
+            page="Order Service",
+        )
+        assert url == (
+            "https://acme.atlassian.net/wiki/display/ENG/Order%20Service"
+        )
+
+    def it_url_encodes_special_chars_in_page_title(self) -> None:
+        url = build_confluence_url(
+            base_url="https://acme.atlassian.net/wiki",
+            space="ENG",
+            page="A & B / C",
+        )
+        # Forward slash and ampersand both encoded so they don't
+        # split the URL path.
+        assert "/display/ENG/" in url
+        assert "%26" in url  # & encoded
+        assert "%2F" in url  # / encoded
+
+    def it_tolerates_a_trailing_slash_on_base(self) -> None:
+        url = build_confluence_url(
+            base_url="https://acme.atlassian.net/wiki/",
+            space="ENG",
+            page="Home",
+        )
+        assert "//display" not in url
+
+
+class DescribeBuildJiraURL:
+    def it_builds_a_browse_url_from_an_int_issue(self) -> None:
+        url = build_jira_url(
+            base_url="https://acme.atlassian.net",
+            project="ABC",
+            issue=123,
+        )
+        assert url == "https://acme.atlassian.net/browse/ABC-123"
+
+    def it_accepts_a_full_issue_key(self) -> None:
+        url = build_jira_url(
+            base_url="https://acme.atlassian.net",
+            project="ABC",
+            issue="ABC-456",
+        )
+        assert url.endswith("/browse/ABC-456")
+
+    def it_accepts_a_bare_numeric_string(self) -> None:
+        url = build_jira_url(
+            base_url="https://acme.atlassian.net",
+            project="ABC",
+            issue="789",
+        )
+        assert url.endswith("/browse/ABC-789")
+
+    def it_tolerates_a_trailing_slash_on_base(self) -> None:
+        url = build_jira_url(
+            base_url="https://acme.atlassian.net/",
+            project="ABC",
+            issue=1,
+        )
+        assert "//browse" not in url
+
+
+# ---------------------------------------------------------------------------
+# Describe Shape.link_to_* convenience helpers
+# ---------------------------------------------------------------------------
+
+
+class DescribeLinkToAWSConsole:
+    def it_attaches_a_default_labelled_aws_console_link(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.link_to_aws_console(
+            service="ec2",
+            resource_id="i-abc",
+            region="ap-southeast-2",
+        )
+        assert h.description == "AWS Console"
+        assert "i-abc" in (h.address or "")
+        assert "ap-southeast-2" in (h.address or "")
+
+    def it_honours_an_explicit_label(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.link_to_aws_console(
+            service="s3", resource_id="my-bucket", label="Bucket"
+        )
+        assert h.description == "Bucket"
+
+    def it_can_be_marked_default(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.link_to_aws_console(service="ec2", default=True)
+        assert h.default is True
+
+
+class DescribeLinkToGitHub:
+    def it_attaches_a_repo_root_link_labelled_github(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.link_to_github(repo="example/order-service")
+        assert h.description == "GitHub"
+        assert h.address == "https://github.com/example/order-service"
+
+    def it_uses_source_label_when_a_file_is_provided(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.link_to_github(
+            repo="example/order-service", file="src/main.py", line=42
+        )
+        assert h.description == "Source"
+        assert h.address.endswith("/blob/main/src/main.py#L42")
+
+    def it_honours_an_explicit_label(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.link_to_github(
+            repo="example/order-service", label="Repository"
+        )
+        assert h.description == "Repository"
+
+
+class DescribeLinkToConfluence:
+    def it_attaches_a_confluence_page_link_labelled_with_page(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.link_to_confluence(
+            space="ENG",
+            page="Order Service",
+            base_url="https://acme.atlassian.net/wiki",
+        )
+        assert h.description == "Order Service"
+        assert "display/ENG/Order%20Service" in (h.address or "")
+
+    def it_honours_an_explicit_label(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.link_to_confluence(
+            space="ENG",
+            page="Order Service",
+            base_url="https://acme.atlassian.net/wiki",
+            label="Runbook",
+        )
+        assert h.description == "Runbook"
+
+
+class DescribeLinkToJira:
+    def it_attaches_a_jira_issue_link_labelled_with_key(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.link_to_jira(
+            project="ABC",
+            issue=123,
+            base_url="https://acme.atlassian.net",
+        )
+        assert h.description == "ABC-123"
+        assert h.address == "https://acme.atlassian.net/browse/ABC-123"
+
+    def it_honours_an_explicit_label(self) -> None:
+        _, _, shape = _fresh_shape()
+        h = shape.link_to_jira(
+            project="ABC",
+            issue=123,
+            base_url="https://acme.atlassian.net",
+            label="Tracker",
+        )
+        assert h.description == "Tracker"
+
+
+# ---------------------------------------------------------------------------
+# Describe round-trip — multi-link save/reload preserves every link
+# ---------------------------------------------------------------------------
+
+
+class DescribeMultiLinkRoundTrip:
+    def it_preserves_multiple_hyperlinks_through_save_reload(self) -> None:
+        # Build the issue's headline pattern: an EC2 shape with three
+        # hyperlinks (AWS console, GitHub, Confluence). Save, reload,
+        # and assert every hyperlink is intact.
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="Architecture")
+        ec2 = page.shapes.add_shape(
+            vsdx.VS_SHAPE_TYPE.RECTANGLE,
+            at=(2, 2),
+            label="Order Service",
+        )
+        ec2.link_to_aws_console(
+            service="ec2",
+            resource_id="i-abc123",
+            region="ap-southeast-2",
+        )
+        ec2.link_to_github(
+            repo="example/order-service", file="src/main.py", line=42
+        )
+        ec2.link_to_confluence(
+            space="ENG",
+            page="Order Service",
+            base_url="https://acme.atlassian.net/wiki",
+        )
+        ec2.link_to_jira(
+            project="ABC",
+            issue=123,
+            base_url="https://acme.atlassian.net",
+        )
+
+        buf = io.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        reloaded = vsdx.Visio(buf)
+        rshape = list(reloaded.pages[0].shapes)[0]
+        descriptions = [h.description for h in rshape.hyperlinks]
+        assert descriptions == ["AWS Console", "Source", "Order Service", "ABC-123"]
+        # Spot-check a few addresses survived round-trip.
+        assert "i-abc123" in (rshape.hyperlinks[0].address or "")
+        assert (
+            rshape.hyperlinks["Source"].address
+            == "https://github.com/example/order-service/blob/main/src/main.py#L42"
+        )
+        assert (
+            rshape.hyperlinks["ABC-123"].address
+            == "https://acme.atlassian.net/browse/ABC-123"
+        )
+
+    def it_preserves_default_flag_on_reload(self) -> None:
+        doc = vsdx.Visio()
+        page = doc.pages.add_page(name="P1")
+        shape = page.shapes.add_shape(
+            vsdx.VS_SHAPE_TYPE.RECTANGLE, at=(1, 1)
+        )
+        shape.link_to_aws_console(service="ec2", resource_id="i-1")
+        shape.link_to_github(repo="x/y", default=True)
+
+        buf = io.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        reloaded = vsdx.Visio(buf)
+        rshape = list(reloaded.pages[0].shapes)[0]
+        default = rshape.hyperlinks.default_hyperlink
+        assert default is not None
+        assert default.description == "GitHub"

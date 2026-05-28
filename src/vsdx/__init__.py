@@ -62,7 +62,14 @@ from vsdx.constants import (
 )
 from vsdx.document import EncryptedPackageError, VisioDocument
 from vsdx.enum.shapes import VS_CONNECTOR_STYLE, VS_SHAPE_TYPE
-from vsdx.hyperlinks import Hyperlink, HyperlinkCollection
+from vsdx.hyperlinks import (
+    Hyperlink,
+    HyperlinkCollection,
+    build_aws_console_url,
+    build_confluence_url,
+    build_github_url,
+    build_jira_url,
+)
 from vsdx.ink import InkStroke
 from vsdx.geometry import (
     ArcTo,
@@ -231,4 +238,8 @@ __all__ = [
     "VisioDocument",
     "VisioPackageOpener",
     "__version__",
+    "build_aws_console_url",
+    "build_confluence_url",
+    "build_github_url",
+    "build_jira_url",
 ]

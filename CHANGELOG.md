@@ -6,6 +6,45 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — auto-hyperlink shapes for cloud / GitHub / Confluence / Jira (#133)
+
+- **`Shape.add_hyperlink(url, label, *, sub_address, new_window, default)`**
+  — ergonomic shortcut over ``shape.hyperlinks.add(...)`` matching the
+  cloud-diagram authoring vocabulary (``url`` + ``label`` rather than
+  the lower-level ``address`` / ``description`` cell names). Visio's
+  multi-hyperlink-per-shape model is preserved — repeated calls
+  append, never replace.
+- **`Shape.link_to_aws_console(service, resource_id, region, ...)`** —
+  build the canonical AWS console deep-link for the given service /
+  resource (ec2 / s3 / lambda / rds / dynamodb / iam / vpc / cloudwatch
+  / sqs / sns; unmapped services fall back to the service home) and
+  attach it. Defaults to the label ``"AWS Console"``.
+- **`Shape.link_to_github(repo, file, line, branch, ...)`** — build a
+  github.com URL (``/blob/<branch>/<file>#L<line>``) and attach it.
+  Defaults the label to ``"Source"`` when a file is supplied,
+  ``"GitHub"`` for repo-root links.
+- **`Shape.link_to_confluence(space, page, base_url, ...)`** — build a
+  Confluence ``/display/<SPACE>/<page>`` URL (Cloud + Server compatible)
+  and attach it. Defaults the label to the page title.
+- **`Shape.link_to_jira(project, issue, base_url, ...)`** — build a
+  Jira ``/browse/<KEY>`` URL and attach it. Accepts an integer issue
+  number or pre-formatted ``"PROJ-123"`` key. Defaults the label to
+  the full issue key.
+- **Module-level URL builders** — ``vsdx.build_aws_console_url`` /
+  ``build_github_url`` / ``build_confluence_url`` / ``build_jira_url``
+  expose the same URL templates for callers writing ad-hoc tooling
+  outside a ``Shape`` proxy.
+- Multi-link round-trip is asserted in
+  ``tests/unit/test_hyperlinks.py::DescribeMultiLinkRoundTrip`` —
+  attach AWS / GitHub / Confluence / Jira links to one shape, save,
+  reload, every link survives in document order with the default flag
+  intact.
+
+The data-graphics ``ds.bind_hyperlink(...)`` extension that auto-
+populates a hyperlink from a row-bound field is **out of scope** here
+— it depends on data-graphics authoring (#118) which hasn't shipped
+and will land alongside it.
+
 ### Added — container shapes for AWS-VPC-style architecture diagrams (#120)
 
 - **`Page.add_container(title, ...)`** — author a labelled rounded

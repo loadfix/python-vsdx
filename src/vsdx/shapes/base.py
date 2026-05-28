@@ -13,7 +13,7 @@ stores everything on a generic cell element distinguished by its
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 from vsdx.enum.cells import ST_Unit
 from vsdx.shared import ParentedElementProxy
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from vsdx.cell import Cell as Cell_
     from vsdx.connection_points import ConnectionPoints
     from vsdx.geometry import Geometries, Geometry
-    from vsdx.hyperlinks import HyperlinkCollection
+    from vsdx.hyperlinks import Hyperlink, HyperlinkCollection
     from vsdx.master import Master
     from vsdx.oxml._stubs import CT_Cell, CT_Shape  # TODO(vsdx/track-1)
     from vsdx.shape_data import ShapeData
@@ -594,6 +594,210 @@ class Shape(ParentedElementProxy):
         from vsdx.hyperlinks import HyperlinkCollection
 
         return HyperlinkCollection(self)
+
+    def add_hyperlink(
+        self,
+        url: str,
+        label: Optional[str] = None,
+        *,
+        sub_address: Optional[str] = None,
+        new_window: bool = False,
+        default: bool = False,
+    ) -> "Hyperlink":
+        """Append a hyperlink to *url* and return its :class:`~vsdx.hyperlinks.Hyperlink` proxy.
+
+        Ergonomic shortcut for the ``shape.hyperlinks.add(...)`` form
+        that closer-matches the cloud-diagram authoring vocabulary —
+        ``url`` + user-visible ``label`` rather than the lower-level
+        ``address`` / ``description`` cell names.
+
+        Visio supports **multiple hyperlinks per shape**; calling
+        ``add_hyperlink`` repeatedly appends — it does **not** replace.
+        The first one defaults to the *default* hyperlink (auto-followed
+        on Ctrl+Click); explicitly pass ``default=True`` on a later
+        link to override.
+
+        :param url: Target URL — http(s), UNC path, or file path.
+        :param label: Optional user-visible label (mapped to the
+          hyperlink's ``Description`` cell). Surfaces as the link text
+          in Visio's right-click menu and Hyperlinks pane.
+        :param sub_address: Optional anchor / fragment within *url*
+          (mapped to ``SubAddress``). For intra-document jumps pass
+          ``url=""`` and ``sub_address="Page-2"``.
+        :param new_window: Open the link in a new window.
+        :param default: Mark this hyperlink as the shape's default —
+          the one Visio auto-follows on Ctrl+Click.
+        :returns: The new :class:`~vsdx.hyperlinks.Hyperlink` proxy
+          (use ``.address`` / ``.description`` to mutate further).
+
+        .. note::
+
+            Auto-binding the URL from a data-graphics field (the
+            ``ds.bind_hyperlink(...)`` shape — see #133's stretch
+            example) is **out of scope** for the initial cut and will
+            land alongside data-graphics authoring (#118).
+
+        .. versionadded:: 0.3.0
+        """
+        return self.hyperlinks.add(
+            url,
+            description=label,
+            sub_address=sub_address,
+            new_window=new_window,
+            default=default,
+        )
+
+    def link_to_aws_console(
+        self,
+        *,
+        service: str,
+        resource_id: Optional[str] = None,
+        region: Optional[str] = None,
+        label: Optional[str] = None,
+        default: bool = False,
+    ) -> "Hyperlink":
+        """Append a hyperlink to the AWS console for *service* / *resource_id*.
+
+        Convenience wrapper that builds the canonical AWS console
+        deep-link URL for the given service (and optional resource /
+        region) via :func:`~vsdx.hyperlinks.build_aws_console_url`,
+        then attaches it to the shape.
+
+        :param service: AWS service code — ``"ec2"``, ``"s3"``,
+          ``"lambda"``, ``"rds"``, ``"dynamodb"``, ``"iam"``, ``"vpc"``,
+          ``"cloudwatch"``, ``"sqs"``, ``"sns"``. Unmapped services
+          fall back to a generic service-home link.
+        :param resource_id: Optional resource identifier (instance-id /
+          bucket-name / function-name / table-name). When supplied,
+          the URL navigates to the resource's detail page.
+        :param region: Optional AWS region (``"ap-southeast-2"``).
+        :param label: Optional user-visible label. Defaults to
+          ``"AWS Console"``.
+        :param default: Mark as the shape's default hyperlink.
+        :returns: The new :class:`~vsdx.hyperlinks.Hyperlink` proxy.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.hyperlinks import build_aws_console_url
+
+        url = build_aws_console_url(
+            service=service, resource_id=resource_id, region=region
+        )
+        return self.add_hyperlink(
+            url, label=label or "AWS Console", default=default
+        )
+
+    def link_to_github(
+        self,
+        *,
+        repo: str,
+        file: Optional[str] = None,
+        line: Optional[int] = None,
+        branch: str = "main",
+        label: Optional[str] = None,
+        default: bool = False,
+    ) -> "Hyperlink":
+        """Append a hyperlink to a github.com repo / file / line.
+
+        Convenience wrapper around
+        :func:`~vsdx.hyperlinks.build_github_url`.
+
+        :param repo: ``"owner/repo"`` slug.
+        :param file: Optional path within the repo (``"src/main.py"``).
+        :param line: Optional 1-based line number. Ignored when *file*
+          is ``None``.
+        :param branch: Branch / ref to link against. Defaults to
+          ``"main"``.
+        :param label: Optional user-visible label. Defaults to
+          ``"GitHub"`` when *file* is ``None`` and ``"Source"`` when
+          *file* is set.
+        :param default: Mark as the shape's default hyperlink.
+        :returns: The new :class:`~vsdx.hyperlinks.Hyperlink` proxy.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.hyperlinks import build_github_url
+
+        url = build_github_url(
+            repo=repo, file=file, line=line, branch=branch
+        )
+        if label is None:
+            label = "Source" if file is not None else "GitHub"
+        return self.add_hyperlink(url, label=label, default=default)
+
+    def link_to_confluence(
+        self,
+        *,
+        space: str,
+        page: str,
+        base_url: str = "https://confluence.atlassian.com/wiki",
+        label: Optional[str] = None,
+        default: bool = False,
+    ) -> "Hyperlink":
+        """Append a hyperlink to a Confluence page in *space*.
+
+        Convenience wrapper around
+        :func:`~vsdx.hyperlinks.build_confluence_url`.
+
+        :param space: Confluence space key (``"ENG"``, ``"DOCS"``).
+        :param page: Page title. Spaces are URL-encoded.
+        :param base_url: Confluence site URL —
+          ``"https://acme.atlassian.net/wiki"`` for Atlassian Cloud,
+          ``"https://confluence.example.com"`` for self-hosted.
+        :param label: Optional user-visible label. Defaults to the
+          page title.
+        :param default: Mark as the shape's default hyperlink.
+        :returns: The new :class:`~vsdx.hyperlinks.Hyperlink` proxy.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.hyperlinks import build_confluence_url
+
+        url = build_confluence_url(
+            base_url=base_url, space=space, page=page
+        )
+        return self.add_hyperlink(url, label=label or page, default=default)
+
+    def link_to_jira(
+        self,
+        *,
+        project: str,
+        issue: Union[int, str],
+        base_url: str = "https://jira.atlassian.com",
+        label: Optional[str] = None,
+        default: bool = False,
+    ) -> "Hyperlink":
+        """Append a hyperlink to a Jira issue.
+
+        Convenience wrapper around
+        :func:`~vsdx.hyperlinks.build_jira_url`.
+
+        :param project: Project key (``"ABC"``, ``"PROJ"``).
+        :param issue: Issue number (``123``) or full key
+          (``"ABC-123"``).
+        :param base_url: Jira site URL —
+          ``"https://acme.atlassian.net"`` for Atlassian Cloud,
+          ``"https://jira.example.com"`` for self-hosted.
+        :param label: Optional user-visible label. Defaults to the
+          full issue key (``"ABC-123"``).
+        :param default: Mark as the shape's default hyperlink.
+        :returns: The new :class:`~vsdx.hyperlinks.Hyperlink` proxy.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.hyperlinks import build_jira_url
+
+        url = build_jira_url(
+            base_url=base_url, project=project, issue=issue
+        )
+        if label is None:
+            if isinstance(issue, int):
+                label = f"{project}-{issue}"
+            elif "-" in issue:
+                label = issue
+            else:
+                label = f"{project}-{issue}"
+        return self.add_hyperlink(url, label=label, default=default)
 
     # -- connector attachments -----------------------------------------
 
