@@ -944,6 +944,35 @@ class Page(PartElementProxy):
 
         return _lint(self, rules=rules)
 
+    # -- layered view (logical / physical / network) -------------------
+
+    def add_layered_view(
+        self,
+        layers: "Iterable[str]",
+        name: Optional[str] = None,
+    ):
+        """Return a fresh :class:`~vsdx.layered_view.LayeredView` builder.
+
+        The returned :class:`~vsdx.layered_view.LayeredView` is a
+        purely logical authoring helper — the page itself isn't
+        decorated. Each call to ``view.show("layer").save_to_page(...)``
+        materialises one freshly-rendered ``.vsdx`` from the builder's
+        accumulated entities and relationships filtered to the matching
+        layer's descriptors.
+
+        See :mod:`vsdx.layered_view` for the AWS-architecture-in-3-views
+        walkthrough.
+
+        :param layers: ordered iterable of layer names; each becomes a
+            valid keyword to :meth:`LayeredView.add_entity`.
+        :param name: optional view name, defaults to this page's name.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.layered_view import _build_layered_view_for_page
+
+        return _build_layered_view_for_page(self, layers=layers, name=name)
+
     # -- SVG export -----------------------------------------------------
 
     def to_svg(self, path: Optional[str] = None) -> str:

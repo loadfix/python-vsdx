@@ -97,6 +97,12 @@ from vsdx.geometry import (
     SplineStart,
     UnknownGeometryRow,
 )
+from vsdx.layered_view import (
+    DEFAULT_KIND_MASTERS,
+    LayeredView,
+    LayeredViewRenderer,
+    load_layered_view,
+)
 from vsdx.layers import Layer, Layers, ShapeLayers
 from vsdx.master import Master, Masters
 from vsdx.page import Page, Pages
@@ -168,6 +174,7 @@ __all__ = [
     "DataRecordset",
     "DataRecordsets",
     "DataRow",
+    "DEFAULT_KIND_MASTERS",
     "EffectVariant",
     "Ellipse",
     "EllipticalArcTo",
@@ -186,6 +193,8 @@ __all__ = [
     "Inches",
     "InkStroke",
     "Layer",
+    "LayeredView",
+    "LayeredViewRenderer",
     "Layers",
     "Length",
     "LineTo",
@@ -252,4 +261,5 @@ __all__ = [
     "build_confluence_url",
     "build_github_url",
     "build_jira_url",
+    "load_layered_view",
 ]

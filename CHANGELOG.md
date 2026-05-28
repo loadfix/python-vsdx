@@ -6,6 +6,31 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — layered diagrams: logical / physical / network views (#132)
+
+- **`Page.add_layered_view(layers=[...])`** — return a
+  :class:`vsdx.LayeredView` builder for multi-view architectures.
+- **`LayeredView.add_entity(id, **per_layer_descriptors)`** —
+  capture one entity once with a separate ``{kind, name, ...}``
+  descriptor per layer; partial layer coverage is honoured (an entity
+  missing a descriptor for a layer is omitted from that layer's
+  render).
+- **`LayeredView.add_relationship(from_id, to_id, kind=...)`** —
+  surfaces in every layer where both endpoints exist; silently
+  skipped on layers where either endpoint is absent.
+- **`LayeredView.show(layer).save_to_page(path)`** — render that
+  layer's entities + connectors as a fresh single-page ``.vsdx``.
+- **`load_layered_view(path)`** — recover the original builder from
+  a ``.vsdx`` saved via ``save_to_page`` (config persisted as a
+  custom XML envelope on the document part).
+- Default kind → master mapping covers ``service`` / ``datastore`` /
+  ``ec2`` / ``rds`` / ``eni`` / ``vpc`` / ``subnet`` / ``queue`` /
+  ``topic`` / ``function`` / ``bucket`` / ``user`` / ``role``;
+  unknown kinds fall back to Rectangle so user-defined kinds still
+  render.
+- See ``vsdx.layered_view`` module docstring for the AWS-architecture-
+  in-3-views walkthrough.
+
 ### Added — auto-hyperlink shapes for cloud / GitHub / Confluence / Jira (#133)
 
 - **`Shape.add_hyperlink(url, label, *, sub_address, new_window, default)`**
