@@ -14,6 +14,7 @@ from typing import IO, TYPE_CHECKING, Any, Mapping, Optional, Union, cast
 
 from vsdx.data_graphics import DataGraphics
 from vsdx.data_recordsets import DataRecordsets
+from vsdx.data_sources import DataSources
 from vsdx.master import Masters
 from vsdx.page import Pages
 from vsdx.shared import PartElementProxy
@@ -82,6 +83,25 @@ class VisioDocument(PartElementProxy):
         .. versionadded:: 0.2.0
         """
         return DataRecordsets(self)
+
+    @lazyproperty
+    def data_sources(self) -> DataSources:
+        """The document's :class:`~vsdx.data_sources.DataSources` collection.
+
+        Higher-level CSV-backed data-source overlay introduced in 0.4.0
+        for issue #118. Sits *above* :attr:`data_recordsets` — where
+        recordsets mirror Visio's own external-data machinery,
+        :class:`DataSources` is a vsdx-local authoring surface for
+        binding shapes to CSV rows and rendering visual indicators.
+
+        Use :meth:`vsdx.page.Page.add_data_source` rather than this
+        collection's :meth:`~vsdx.data_sources.DataSources.add` for
+        the public authoring spelling — pages forward to here so every
+        page sees the same source pool.
+
+        .. versionadded:: 0.4.0
+        """
+        return DataSources(self)
 
     # -- hyperlink base --------------------------------------------------
 

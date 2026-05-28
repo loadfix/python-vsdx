@@ -31,6 +31,30 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 - See ``vsdx.layered_view`` module docstring for the AWS-architecture-
   in-3-views walkthrough.
 
+### Added — data graphics: link shapes to CSV rows + visual indicators (#118)
+
+- **`Page.add_data_source(path, *, name, key)`** — register a
+  CSV-backed external data source on the owning document. Sources
+  are document-scoped so every page sees every source; the call
+  delegates to :attr:`VisioDocument.data_sources`.
+- **`Shape.bind_to_row(source, key, *, key_column)`** — attach a
+  shape to a row in *source* by natural key. Recorded as
+  ``<Cell N="DataSourceBinding" V="<source-id>!<key>">`` on the
+  shape; round-trip safe through save / open.
+- **`DataSource.add_data_graphic(field, kind, *, rules, min, max,
+  color, position)`** — declare an overlay graphic on a source.
+  Four graphic kinds are supported in v1: ``text-callout``,
+  ``icon-set``, ``data-bar``, and ``color-by-value``.
+- **`DataSource.refresh()`** — re-read the CSV and update every
+  shape bound to this source. Mirrors row columns onto the shape's
+  ShapeData ``<Section N="Property">``, applies every declared
+  graphic, and clears stale overlay sentinels for shapes whose key
+  no longer matches a row.
+- **Excel ``.xlsx`` and SQL data sources** are explicit follow-ups,
+  documented on :meth:`Page.add_data_source` (they can ride on
+  ``python-xlsx``'s :class:`Workbook` and the ADO machinery already
+  exposed by :class:`DataRecordset` respectively).
+
 ### Added — auto-hyperlink shapes for cloud / GitHub / Confluence / Jira (#133)
 
 - **`Shape.add_hyperlink(url, label, *, sub_address, new_window, default)`**

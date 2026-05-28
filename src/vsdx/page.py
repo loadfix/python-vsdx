@@ -317,6 +317,55 @@ class Page(PartElementProxy):
         """Allocate a fresh ``@ID`` for a new shape on this page."""
         return self._page_part.allocate_shape_id()
 
+    # -- data sources (issue #118) --------------------------------------
+
+    @property
+    def data_sources(self):
+        """The owning document's :class:`~vsdx.data_sources.DataSources` collection.
+
+        Sources are document-scoped (every page sees every source) so
+        this property is a thin pass-through to
+        :attr:`vsdx.document.VisioDocument.data_sources`. Provided on
+        the page for ergonomic symmetry with :meth:`add_data_source`.
+
+        .. versionadded:: 0.4.0
+        """
+        document = self._parent._parent  # Pages → VisioDocument
+        return document.data_sources
+
+    def add_data_source(
+        self,
+        path: str,
+        *,
+        name: "Optional[str]" = None,
+        key: "Optional[str]" = None,
+    ):
+        """Register a CSV-backed data source on the owning document.
+
+        Returns a :class:`~vsdx.data_sources.DataSource` callers can
+        configure with :meth:`~vsdx.data_sources.DataSource.add_data_graphic`.
+        Sources are document-scoped — adding from any page registers
+        the source for every page in the document.
+
+        :param path: Filesystem path to the CSV. Not read until the
+            first :meth:`~vsdx.data_sources.DataSource.refresh`; a
+            missing file at registration time is fine.
+        :param name: Optional display name; defaults to the basename of
+            *path*.
+        :param key: Optional default key column. When ``None``, the
+            first :meth:`Shape.bind_to_row` call's ``key=`` argument
+            is recorded as the source-wide default.
+
+        Excel ``.xlsx`` ranges and SQL data sources are explicit
+        follow-ups — Excel can ride on ``python-xlsx``'s
+        :class:`Workbook` rowsets, SQL on the ADO machinery already
+        plumbed through :class:`~vsdx.data_recordsets.DataRecordset`.
+
+        .. versionadded:: 0.4.0
+        """
+        document = self._parent._parent  # Pages → VisioDocument
+        return document.data_sources.add(path, name=name, key=key)
+
     # -- ShapeSheet formula recomputation -------------------------------
 
     def recompute(self) -> int:

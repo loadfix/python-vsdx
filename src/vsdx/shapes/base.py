@@ -475,6 +475,56 @@ class Shape(ParentedElementProxy):
             return []
         return _shape_data_bindings(self, document)
 
+    # -- high-level CSV-source bindings (issue #118) -------------------
+
+    def bind_to_row(
+        self,
+        source,
+        key: str,
+        *,
+        key_column: "Optional[str]" = None,
+    ) -> None:
+        """Bind this shape to a row in *source* by *key*.
+
+        :param source: A :class:`~vsdx.data_sources.DataSource`
+            obtained via :meth:`vsdx.page.Page.add_data_source`.
+        :param key: The key value (or, when ``key_column is None`` and
+            the source has no recorded key column, the column **name**
+            on which to key — matching the issue-#118 snippet's
+            ``shape.bind_to_row(ds, key='ID')`` call shape).
+        :param key_column: Optional override for the key column on
+            this binding only. When supplied, the next
+            :meth:`~vsdx.data_sources.DataSource.refresh` looks up the
+            row whose value in *key_column* equals *key*.
+
+        Idempotent — re-binding the same shape overwrites the previous
+        binding cell.
+
+        .. versionadded:: 0.4.0
+        """
+        from vsdx.data_sources import DataSource, _bind_shape_to_row
+
+        if not isinstance(source, DataSource):
+            raise TypeError(
+                "shape.bind_to_row expects a DataSource, got %s"
+                % type(source).__name__
+            )
+        _bind_shape_to_row(self, source, key, key_column=key_column)
+
+    @property
+    def data_source_binding(self):
+        """``(source_id, key)`` for this shape's CSV-source binding, or ``None``.
+
+        Reads ``<Cell N="DataSourceBinding" V="<source-id>!<key>">``
+        on the shape. Returns ``None`` when the shape has no binding
+        cell or the cell value is malformed.
+
+        .. versionadded:: 0.4.0
+        """
+        from vsdx.data_sources import _shape_binding
+
+        return _shape_binding(self)
+
     def _owning_document(self):
         """Walk up the proxy tree to the :class:`VisioDocument` that owns
         this shape. Returns ``None`` when the shape was constructed
