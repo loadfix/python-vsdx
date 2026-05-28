@@ -6,6 +6,28 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — SIPOC + process-map template kits (#128)
+
+- **`vsdx.kit.process.build_sipoc`** — five-column SIPOC (Suppliers /
+  Inputs / Process / Outputs / Customers) scoping table. Returns a
+  fully-formed :class:`~vsdx.document.VisioDocument` from a ``title``
+  plus five named-list arguments. Lays out a title band, a header
+  band, and five equal-width columns; each column body holds a
+  vertical stack of named cells.
+- **`vsdx.kit.process.build_process_map`** — vertical flowchart from a
+  list of ``{"kind": ..., "text": ...}`` step dicts. ``start`` /
+  ``end`` render as ellipses (the rounded-terminator convention),
+  ``decision`` renders as a diamond authored via
+  :meth:`~vsdx.shapes.shapetree.ShapeTree.add_custom_shape`, ``task``
+  renders as a plain rectangle. Steps stack top-to-bottom on a shared
+  centreline and are auto-wired with right-angle dynamic connectors
+  (issue #53) when ``flows`` is omitted; pass an explicit ``flows``
+  list to override the default sequential wiring.
+- **Public constants** — :data:`~vsdx.kit.process.PROCESS_STEP_KINDS`
+  (frozen tuple of the four recognised step-kind tokens) and
+  :data:`~vsdx.kit.process.SIPOC_COLUMN_ORDER` (canonical column
+  order) are re-exported from :mod:`vsdx.kit`.
+
 ### Added — swim-lane diagram template kit (#121)
 
 - **`vsdx.kit`** — new authoring-kit namespace for high-level diagram

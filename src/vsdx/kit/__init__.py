@@ -22,6 +22,10 @@ Available kits:
 
 * :func:`vsdx.kit.swim_lanes.build_swim_lane_diagram` — cross-functional
   swim-lane diagrams (issue #121, the first kit).
+* :func:`vsdx.kit.process.build_sipoc` — five-column SIPOC scoping
+  table (issue #128).
+* :func:`vsdx.kit.process.build_process_map` — vertical flowchart
+  with start / task / decision / end step kinds (issue #128).
 
 The kit modules avoid third-party runtime deps so they remain
 import-light. The ``[kit]`` extra in ``pyproject.toml`` is reserved
@@ -35,6 +39,16 @@ kits grow optional dependencies.
 
 from __future__ import annotations
 
+from vsdx.kit.process import (
+    PROCESS_KIND_DECISION,
+    PROCESS_KIND_END,
+    PROCESS_KIND_START,
+    PROCESS_KIND_TASK,
+    PROCESS_STEP_KINDS,
+    SIPOC_COLUMN_ORDER,
+    build_process_map,
+    build_sipoc,
+)
 from vsdx.kit.swim_lanes import (
     SWIM_LANE_STEP_KINDS,
     SWIM_LANE_KIND_DECISION,
@@ -45,10 +59,18 @@ from vsdx.kit.swim_lanes import (
 )
 
 __all__ = [
+    "PROCESS_KIND_DECISION",
+    "PROCESS_KIND_END",
+    "PROCESS_KIND_START",
+    "PROCESS_KIND_TASK",
+    "PROCESS_STEP_KINDS",
+    "SIPOC_COLUMN_ORDER",
     "SWIM_LANE_KIND_DECISION",
     "SWIM_LANE_KIND_DEFAULT",
     "SWIM_LANE_KIND_END",
     "SWIM_LANE_KIND_START",
     "SWIM_LANE_STEP_KINDS",
+    "build_process_map",
+    "build_sipoc",
     "build_swim_lane_diagram",
 ]
