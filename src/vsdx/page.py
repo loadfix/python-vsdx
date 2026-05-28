@@ -13,7 +13,7 @@ IDs within this page).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator, Optional
+from typing import TYPE_CHECKING, Iterable, Iterator, Optional
 
 from vsdx.shapes.shapetree import ShapeTree
 from vsdx.shared import ParentedElementProxy, PartElementProxy
@@ -790,6 +790,48 @@ class Page(PartElementProxy):
             width=width,
         )
         return InkStroke(trace, ink_part.ink)
+
+    # -- diagram lint ---------------------------------------------------
+
+    def lint(
+        self,
+        rules: "Optional[Iterable[str]]" = None,
+    ) -> "list":
+        """Inspect this page for diagram-quality issues.
+
+        Returns a list of :class:`vsdx.lint.Finding` instances — one per
+        rule violation found. *rules* is an optional iterable of rule-id
+        strings restricting which checks run; the default runs every
+        rule in :data:`vsdx.lint.DEFAULT_RULES`.
+
+        Rule catalogue (severity in brackets):
+
+        - ``shape-overlap`` (error) — two shapes overlap by more than
+          5 % of the smaller's area.
+        - ``disconnected-node`` (warning) — a non-connector shape with
+          neither incoming nor outgoing connectors.
+        - ``unlabeled-connector`` (warning) — connector with empty text.
+        - ``connector-crossings`` (info) — five or more line crossings
+          on the page.
+        - ``inconsistent-shape-size`` (warning) — within one master /
+          shape-type, area varies by more than 2x.
+        - ``off-grid`` (info) — pin coordinates not aligned to the page's
+          grid spacing (only fires when ``XGridSpacing`` /
+          ``YGridSpacing`` is set).
+        - ``text-overflow`` (warning) — shape text estimated to exceed
+          the shape's height at the default 10-pt font.
+        - ``label-readability`` (info) — label point size below 8 pt.
+
+        Findings are returned in rule-declaration order, then in
+        document order within each rule. Unknown rule-ids in *rules* are
+        silently ignored — forward-compatible with rule names from a
+        future package version.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.lint import lint as _lint
+
+        return _lint(self, rules=rules)
 
     # -- SVG export -----------------------------------------------------
 

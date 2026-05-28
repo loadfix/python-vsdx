@@ -6,6 +6,21 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — diagram-quality lint (#134)
+
+- **`Page.lint(rules=None)`** — return a list of
+  :class:`~vsdx.lint.Finding` instances surfacing diagram-quality issues.
+  Eight rules ship: ``shape-overlap`` (error, >5 % area overlap),
+  ``disconnected-node`` (warning), ``unlabeled-connector`` (warning),
+  ``connector-crossings`` (info, ≥5 crossings), ``inconsistent-shape-size``
+  (warning, >2x area variance per master), ``off-grid`` (info, when
+  ``XGridSpacing`` / ``YGridSpacing`` is set), ``text-overflow``
+  (warning), ``label-readability`` (info, <8 pt). Rule IDs are accepted
+  via the ``rules=`` kwarg; unknown IDs are silently skipped.
+- **`python -m vsdx lint <path>`** — CLI wrapper that walks every page
+  and prints findings one-per-line. Exits non-zero on any
+  ``error``-severity finding so the command slots into a CI gate.
+
 ### Added — custom-geometry authoring entry points (vsdx-maturity-geometry)
 
 - **`Shapes.add_custom_shape(at, size, master=None)`** — drop a
