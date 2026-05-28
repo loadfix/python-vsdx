@@ -6,6 +6,33 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — floor-plan template kit (#127)
+
+- **`vsdx.kit.floor_plan.build_floor_plan`** — author an office /
+  residential floor plan from plain-Python descriptions of rooms,
+  furniture, and fixtures. Returns a fully-formed
+  :class:`~vsdx.document.VisioDocument` ready to save.
+- **Rooms** are bottom-left-anchored rectangles (x / y / width /
+  height) carrying an optional ``capacity`` field that is recorded on
+  shape data so a downstream data-graphics pass can pick it up.
+- **Furniture kinds** — :data:`FURNITURE_KIND_DESK`, ``CHAIR``,
+  ``SOFA``, ``BED``, ``TABLE``, ``BOOKSHELF`` — render as scaled
+  rectangles labelled with their kind. Per-kind default footprints
+  live in :data:`FURNITURE_DEFAULT_SIZES`; per-element ``width`` /
+  ``height`` overrides are honoured. ``rotation`` (degrees) is applied
+  via Visio's Angle cell.
+- **Fixture kinds** — :data:`FIXTURE_KIND_DOOR` and
+  :data:`FIXTURE_KIND_WINDOW` — render as thin openings on a wall
+  (``"left"`` / ``"right"`` / ``"top"`` / ``"bottom"``). Each fixture
+  is tagged with shape data ``Kind`` and ``Wall`` for downstream
+  filtering.
+- **Units** — default plan-wide unit is ``"feet"`` (matches Visio's
+  stock floor-plan template); per-element ``"meters"`` / ``"m"``
+  overrides scale into feet via :data:`METERS_PER_FOOT`.
+- **Public re-exports** — every constant + builder is reachable as
+  ``vsdx.kit.build_floor_plan`` / ``vsdx.kit.FURNITURE_KINDS`` /
+  ``vsdx.kit.FIXTURE_KINDS`` / etc.
+
 ### Added — fishbone / Ishikawa template kit (#129)
 
 - **`vsdx.kit.fishbone.build_fishbone`** — author a cause-and-effect

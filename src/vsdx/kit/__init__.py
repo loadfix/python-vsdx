@@ -33,6 +33,8 @@ Available kits:
   :func:`vsdx.kit.org_chart.build_org_chart_from_csv` —
   hierarchical org charts authored from a programmatic roster or a
   CSV file (issue #122).
+* :func:`vsdx.kit.floor_plan.build_floor_plan` — office floor plan
+  with rooms, furniture, and wall fixtures (issue #127).
 
 The kit modules avoid third-party runtime deps so they remain
 import-light. The ``[kit]`` extra in ``pyproject.toml`` is reserved
@@ -50,6 +52,25 @@ from vsdx.kit.fishbone import (
     FISHBONE_BRANCH_ANGLE_DEG,
     FISHBONE_DEFAULT_CATEGORIES,
     build_fishbone,
+)
+from vsdx.kit.floor_plan import (
+    FIXTURE_KIND_DOOR,
+    FIXTURE_KIND_WINDOW,
+    FIXTURE_KINDS,
+    FIXTURE_WALL_SIDES,
+    FURNITURE_DEFAULT_SIZES,
+    FURNITURE_KIND_BED,
+    FURNITURE_KIND_BOOKSHELF,
+    FURNITURE_KIND_CHAIR,
+    FURNITURE_KIND_DESK,
+    FURNITURE_KIND_SOFA,
+    FURNITURE_KIND_TABLE,
+    FURNITURE_KINDS,
+    METERS_PER_FOOT,
+    UNIT_FEET,
+    UNIT_METERS,
+    UNIT_TOKENS,
+    build_floor_plan,
 )
 from vsdx.kit.org_chart import (
     DEFAULT_MANAGER_COL,
@@ -87,6 +108,19 @@ __all__ = [
     "DEFAULT_TITLE_COL",
     "FISHBONE_BRANCH_ANGLE_DEG",
     "FISHBONE_DEFAULT_CATEGORIES",
+    "FIXTURE_KIND_DOOR",
+    "FIXTURE_KIND_WINDOW",
+    "FIXTURE_KINDS",
+    "FIXTURE_WALL_SIDES",
+    "FURNITURE_DEFAULT_SIZES",
+    "FURNITURE_KIND_BED",
+    "FURNITURE_KIND_BOOKSHELF",
+    "FURNITURE_KIND_CHAIR",
+    "FURNITURE_KIND_DESK",
+    "FURNITURE_KIND_SOFA",
+    "FURNITURE_KIND_TABLE",
+    "FURNITURE_KINDS",
+    "METERS_PER_FOOT",
     "PROCESS_KIND_DECISION",
     "PROCESS_KIND_END",
     "PROCESS_KIND_START",
@@ -98,7 +132,11 @@ __all__ = [
     "SWIM_LANE_KIND_END",
     "SWIM_LANE_KIND_START",
     "SWIM_LANE_STEP_KINDS",
+    "UNIT_FEET",
+    "UNIT_METERS",
+    "UNIT_TOKENS",
     "build_fishbone",
+    "build_floor_plan",
     "build_org_chart",
     "build_org_chart_from_csv",
     "build_process_map",
