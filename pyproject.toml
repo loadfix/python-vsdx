@@ -62,6 +62,13 @@ docs = [
 encryption = [
     "python-ooxml-crypto @ git+https://github.com/loadfix/python-ooxml-crypto@master",
 ]
+# -- Optional high-level diagram-template kit (issue #121). Currently
+#    empty — every kit module under :mod:`vsdx.kit` is import-light and
+#    has no third-party deps beyond what the core library already pulls
+#    in. The extra is reserved as a stable opt-in marker so downstream
+#    consumers can write ``pip install 'python-vsdx[kit]'`` today and
+#    have that command keep working as future kits grow optional deps.
+kit = []
 
 [tool.setuptools.dynamic]
 version = {attr = "vsdx.__version__"}

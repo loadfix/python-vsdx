@@ -6,6 +6,25 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — swim-lane diagram template kit (#121)
+
+- **`vsdx.kit`** — new authoring-kit namespace for high-level diagram
+  templates. The first kit ships
+  :func:`vsdx.kit.swim_lanes.build_swim_lane_diagram`, returning a
+  fully-formed :class:`~vsdx.document.VisioDocument` from a
+  ``title`` / ``lanes`` / ``steps`` / ``flows`` description.
+- **Layout** — vertical lanes of equal width with a title band and a
+  per-lane header band; steps stack top-to-bottom inside their lane in
+  declaration order; flows are emitted as right-angle dynamic
+  connectors between the named step shapes.
+- **Step kinds** — ``start`` / ``end`` render as ellipses (the
+  rounded-terminator convention), ``decision`` renders as a diamond
+  authored via :meth:`~vsdx.shapes.shapetree.ShapeTree.add_custom_shape`,
+  and the default kind renders as a plain rectangle.
+- **`[kit]` extra in pyproject.toml** — empty today (kits are
+  import-light) but reserved as a stable opt-in marker so future
+  optional kit dependencies can land without breaking installs.
+
 ### Added — auto-layout algorithms (#50)
 
 - **`Page.layout(kind, **kwargs)`** — mutate every non-connector
