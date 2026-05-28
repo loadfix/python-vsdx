@@ -10,6 +10,7 @@ collections, and dispatches ``save`` through to the underlying
 from __future__ import annotations
 
 import io
+import os
 from typing import IO, TYPE_CHECKING, Any, Mapping, Optional, Union, cast
 
 from vsdx.data_graphics import DataGraphics
@@ -581,6 +582,91 @@ class VisioDocument(PartElementProxy):
             package = VisioPackage.open(stream, strict=strict)
 
         return VisioDocument(package.main_document_part, package)
+
+    # -- Graphviz DOT import --------------------------------------------
+
+    @classmethod
+    def from_dot(
+        cls,
+        path: "Union[str, os.PathLike[str]]",
+        *,
+        page_name: Optional[str] = None,
+        page_width: Optional[float] = None,
+        page_height: Optional[float] = None,
+        encoding: str = "utf-8",
+    ) -> VisioDocument:
+        """Read a Graphviz DOT file and return a :class:`VisioDocument`.
+
+        Pure-Python parser — does **not** require Graphviz binaries or
+        the ``pydot`` / ``graphviz`` PyPI packages. Supported syntax
+        subset and out-of-scope features (HTML-like labels, strict
+        mode, Sugiyama layout) are documented in
+        :mod:`vsdx.kit.from_dot`.
+
+        Auto-layout is a simple top-down grid: nodes with no incoming
+        edges anchor the first row; subsequent rows are formed by
+        peeling off resolved sources. Cycles emit their remaining
+        members as a final row in declaration order. The result is
+        deterministic but visually plain — post-process the document
+        in Visio (or via :mod:`vsdx.layout`) for a tidier rendering.
+
+        :param path: filesystem path to a ``.dot`` / ``.gv`` source file.
+        :param page_name: optional page ``@NameU``. Defaults to the
+            graph's declared name (``digraph X { ... }``) or
+            ``"DOT graph"`` for anonymous graphs.
+        :param page_width: optional explicit page width in inches.
+            When omitted, sized to fit the laid-out grid plus margins.
+        :param page_height: optional explicit page height in inches.
+        :param encoding: text encoding used to decode the file.
+            Defaults to ``"utf-8"``.
+
+        :returns: a fully-formed :class:`VisioDocument` ready to
+            :meth:`save`.
+
+        :raises vsdx.kit.from_dot.DotParseError: when the source is
+            not valid DOT.
+
+        .. versionadded:: 0.4.0
+        """
+        # Local import to avoid pulling the kit module at package load.
+        from vsdx.kit.from_dot import document_from_dot
+
+        return document_from_dot(
+            path,
+            page_name=page_name,
+            page_width=page_width,
+            page_height=page_height,
+            encoding=encoding,
+        )
+
+    @classmethod
+    def from_dot_string(
+        cls,
+        source: str,
+        *,
+        page_name: Optional[str] = None,
+        page_width: Optional[float] = None,
+        page_height: Optional[float] = None,
+    ) -> VisioDocument:
+        """Like :meth:`from_dot` but accepts the DOT source as a string.
+
+        :param source: DOT-language source text.
+        :param page_name: forwarded to :meth:`from_dot`.
+        :param page_width: forwarded to :meth:`from_dot`.
+        :param page_height: forwarded to :meth:`from_dot`.
+
+        :returns: a fully-formed :class:`VisioDocument`.
+
+        .. versionadded:: 0.4.0
+        """
+        from vsdx.kit.from_dot import document_from_dot_string
+
+        return document_from_dot_string(
+            source,
+            page_name=page_name,
+            page_width=page_width,
+            page_height=page_height,
+        )
 
 
 _OLE_CFB_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"

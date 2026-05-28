@@ -25,6 +25,41 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   closed. Pure-Python parser, no third-party dependency, no Java
   jar required. Implemented under :mod:`vsdx.kit.from_plantuml`
   and re-exported from :mod:`vsdx.kit`.
+### Added — Graphviz DOT importer (#125)
+
+- **`VisioDocument.from_dot(path)`** / **`VisioDocument.from_dot_string(text)`**
+  — read a Graphviz DOT (`.dot` / `.gv`) source and author the matching
+  Visio document. Pure-Python parser; no `pydot` / `graphviz` PyPI
+  dependency and no Graphviz binary required.
+- **`vsdx.kit.from_dot.document_from_dot`** /
+  **`vsdx.kit.from_dot.document_from_dot_string`** — module-level
+  spellings that the classmethods above delegate to.
+- **Supported DOT subset** — `digraph` / `graph` keywords (directed +
+  undirected), node and edge declarations with attribute lists, edge
+  chains (`A -> B -> C`), inline subgraph endpoints (`A -> { B C }`),
+  cluster subgraphs (`subgraph cluster_0 { … }`) rendered as labelled
+  rectangle wrappers, port references stripped, C-style line + block
+  comments, the `strict` keyword tolerated.
+- **Recognised shapes** — `box` / `rect` / `rectangle` / `square`
+  (rectangle), `ellipse` / `oval` / `circle` (ellipse), `diamond` /
+  `rhombus` (custom diamond geometry), `parallelogram` (custom
+  parallelogram geometry). Unrecognised shapes fall back to box.
+- **Recognised attributes** — `label`, `shape`, `color`, `fillcolor`,
+  `style=dashed` / `style=dotted` (line patterns 2 / 4), `width`,
+  `height`. Edge `label` becomes the connector text; edge `color` /
+  `style` propagate to the connector.
+- **Auto-layout** — simple top-down grid; nodes with no incoming
+  edges anchor the first row, subsequent rows form by peeling off
+  resolved sources. Cycles emit their remaining members as a final
+  row in declaration order. Sugiyama layered layout is **not**
+  implemented — post-process in Visio or via `vsdx.layout` for a
+  tidier rendering.
+- **Out-of-scope (documented as future work)** — strict-mode
+  duplicate-edge collapse, HTML-like labels (`label=<<TABLE>...>>`),
+  external attribute scoping (`node [...]` defaults applied to
+  subsequent declarations).
+- **`DotParseError`** exception carries the offending line number so
+  callers can surface a useful pointer.
 
 ### Added — high-level diagram pattern factories (#52)
 
@@ -55,7 +90,6 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   ``vsdx.kit.aws_three_tier`` / ``sequence_diagram`` /
   ``gantt_chart`` / ``mind_map``.
 
-<<<<<<< HEAD
 ### Added — UML class diagram template kit (#131)
 
 - **`vsdx.kit.uml.uml_from_python_module`** — author a UML class
@@ -87,7 +121,6 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   constants are reachable as ``vsdx.kit.uml_from_python_module`` /
   ``vsdx.kit.uml_from_json_schema`` / ``vsdx.kit.uml_from_typescript``
   / ``vsdx.kit.UML_RELATIONS``.
-=======
 ### Added — workbook → Visio dispatcher (#136)
 
 - **`vsdx.kit.from_workbook.diagram_from_xlsx`** — read an ``.xlsx``
@@ -125,7 +158,6 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   :data:`~vsdx.kit.from_workbook.DIAGRAM_KINDS`, and every
   ``KIND_*`` / ``*_DEFAULT_*_COL`` constant are reachable from
   :mod:`vsdx.kit`.
->>>>>>> 8ac63259 (feat(vsdx-kit): diagram_from_xlsx — workbook → diagram dispatcher (#136))
 
 ### Added — floor-plan template kit (#127)
 
