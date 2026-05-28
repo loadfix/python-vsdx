@@ -35,6 +35,10 @@ Available kits:
   CSV file (issue #122).
 * :func:`vsdx.kit.floor_plan.build_floor_plan` — office floor plan
   with rooms, furniture, and wall fixtures (issue #127).
+* :func:`vsdx.kit.erd.erd_from_sql` /
+  :func:`vsdx.kit.erd.erd_from_models` — entity-relationship
+  diagrams authored from a SQL DDL file or a programmatic
+  ``{table: {columns: [...]}}`` mapping (issue #130).
 
 The kit modules avoid third-party runtime deps so they remain
 import-light. The ``[kit]`` extra in ``pyproject.toml`` is reserved
@@ -48,6 +52,14 @@ kits grow optional dependencies.
 
 from __future__ import annotations
 
+from vsdx.kit.erd import (
+    ERD_CONSTRAINT_FK_PREFIX,
+    ERD_CONSTRAINT_NOT_NULL,
+    ERD_CONSTRAINT_PK,
+    ERD_CONSTRAINT_UNIQUE,
+    erd_from_models,
+    erd_from_sql,
+)
 from vsdx.kit.fishbone import (
     FISHBONE_BRANCH_ANGLE_DEG,
     FISHBONE_DEFAULT_CATEGORIES,
@@ -106,6 +118,10 @@ __all__ = [
     "DEFAULT_PHOTO_COL",
     "DEFAULT_TEAM_COL",
     "DEFAULT_TITLE_COL",
+    "ERD_CONSTRAINT_FK_PREFIX",
+    "ERD_CONSTRAINT_NOT_NULL",
+    "ERD_CONSTRAINT_PK",
+    "ERD_CONSTRAINT_UNIQUE",
     "FISHBONE_BRANCH_ANGLE_DEG",
     "FISHBONE_DEFAULT_CATEGORIES",
     "FIXTURE_KIND_DOOR",
@@ -142,4 +158,6 @@ __all__ = [
     "build_process_map",
     "build_sipoc",
     "build_swim_lane_diagram",
+    "erd_from_models",
+    "erd_from_sql",
 ]

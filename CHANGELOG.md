@@ -33,6 +33,41 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
   ``vsdx.kit.build_floor_plan`` / ``vsdx.kit.FURNITURE_KINDS`` /
   ``vsdx.kit.FIXTURE_KINDS`` / etc.
 
+### Added — entity-relationship diagram template kit (#130)
+
+- **`vsdx.kit.erd.erd_from_models`** — author a database-schema ERD
+  from a programmatic ``{table: {columns: [...]}}`` mapping. Each
+  table renders as a labelled rectangle whose body lists every
+  column on a separate line (name + type+constraint, tab-aligned),
+  with primary-key columns floating to the top. Foreign-key columns
+  emit a right-angle dynamic connector to the target table; the
+  source/target column pair plus the relationship cardinality
+  (``many:one``) ride along on the connector's
+  :attr:`~vsdx.shapes.base.Shape.data` so a downstream pass can
+  decorate the endpoints with crow's-foot glyphs without re-parsing
+  the schema. Kit picks ``"hierarchy"`` layout when at least one FK
+  edge exists and ``"force-directed"`` otherwise; overridable via
+  the ``layout`` kwarg.
+- **`vsdx.kit.erd.erd_from_sql`** — same builder driven by a SQL
+  DDL file or a raw DDL string. The bundled
+  :func:`~vsdx.kit.erd.parse_sql_ddl` parser handles ``CREATE TABLE
+  [IF NOT EXISTS]`` plus the column-list grammar that 95 % of
+  authoring schemas use (inline ``PRIMARY KEY`` / ``UNIQUE`` /
+  ``NOT NULL`` / ``REFERENCES``, plus table-level ``PRIMARY KEY``,
+  ``UNIQUE``, and ``FOREIGN KEY`` clauses with optional
+  ``CONSTRAINT`` names). Backtick / double-quote / square-bracket
+  identifier quoting, schema-prefixed table names, line + block
+  comments, and trailing engine clauses (``ENGINE=InnoDB``) are all
+  tolerated. The parser is intentionally minimal — anything it
+  can't understand is silently skipped.
+- **Public constants** —
+  :data:`~vsdx.kit.erd.ERD_CONSTRAINT_PK`,
+  :data:`~vsdx.kit.erd.ERD_CONSTRAINT_UNIQUE`,
+  :data:`~vsdx.kit.erd.ERD_CONSTRAINT_NOT_NULL`, and
+  :data:`~vsdx.kit.erd.ERD_CONSTRAINT_FK_PREFIX` are re-exported
+  from :mod:`vsdx.kit` for callers building constraint suffixes
+  programmatically.
+
 ### Added — fishbone / Ishikawa template kit (#129)
 
 - **`vsdx.kit.fishbone.build_fishbone`** — author a cause-and-effect
