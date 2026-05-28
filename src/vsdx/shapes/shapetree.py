@@ -63,18 +63,37 @@ class ShapeTree(ParentedElementProxy):
         at: PointLike = (0.0, 0.0),
         size: PointLike = (1.0, 1.0),
         text: Optional[str] = None,
+        label: Optional[str] = None,
+        container: "Optional[object]" = None,
     ) -> _BuiltInAutoShape:
         """Add a built-in autoshape and return its proxy.
 
         :param shape_type: Either a :class:`VS_SHAPE_TYPE` member or the
             raw NameU string of a built-in master (``"Rectangle"``,
-            ``"Ellipse"``, ``"Triangle"``).
+            ``"Ellipse"``, ``"Triangle"``). Names match
+            case-insensitively against the registry so ``"rectangle"``
+            and ``"Rectangle"`` both resolve.
         :param at: ``(pin_x, pin_y)`` tuple in inches — the shape's
             centre-pin position.
         :param size: ``(width, height)`` tuple in inches.
         :param text: optional initial text content.
+        :param label: alias for *text* (matches the cloud-diagram
+            authoring vocabulary used by container shapes).
+        :param container: optional :class:`~vsdx.container.Container`
+            that the new shape should belong to — the shape is moved
+            from the page's top-level shape tree into the container's
+            nested ``<Shapes>`` and its PinX/PinY are converted to
+            container-local coordinates.
         """
         name_u = shape_type.value if isinstance(shape_type, VS_SHAPE_TYPE) else str(shape_type)
+        # Case-insensitive lookup against the autoshape registry: lets
+        # callers pass ``"rectangle"`` (the cloud-diagram convention)
+        # and have it resolve to the ``"Rectangle"`` master.
+        if name_u not in AUTOSHAPE_REGISTRY:
+            for canonical in AUTOSHAPE_REGISTRY:
+                if canonical.lower() == name_u.lower():
+                    name_u = canonical
+                    break
         shape_el = self._element.shapes_element.add_shape(master_name_u=name_u)
 
         # Allocate a shape ID via the owning page.
@@ -86,8 +105,18 @@ class ShapeTree(ParentedElementProxy):
         pin_x, pin_y = float(at[0]), float(at[1])
         w, h = float(size[0]), float(size[1])
         proxy.set_geometry(pin_x, pin_y, w, h)
-        if text is not None:
-            proxy.text = text
+        text_value = text if text is not None else label
+        if text_value is not None:
+            proxy.text = text_value
+        if container is not None:
+            from vsdx.container import Container
+
+            if not isinstance(container, Container):
+                raise TypeError(
+                    "container= must be a vsdx.container.Container, got %r"
+                    % type(container).__name__
+                )
+            container._adopt(proxy)
         return proxy
 
     def add_custom_shape(
@@ -415,6 +444,10 @@ class ShapeTree(ParentedElementProxy):
         # may not carry a ``@Master`` attribute (user-authored groups
         # typically don't; master-instance groups do).
         if shape_el.get("Type") == VS_SHAPE_TYPE.GROUP.value:
+            from vsdx.container import Container
+
+            if Container.is_container_element(shape_el):
+                return Container(shape_el, self)
             return GroupShape(shape_el, self)
         name_u = shape_el.get("Master") or ""
         if name_u == VS_SHAPE_TYPE.DYNAMIC_CONNECTOR.value:

@@ -6,6 +6,40 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — container shapes for AWS-VPC-style architecture diagrams (#120)
+
+- **`Page.add_container(title, ...)`** — author a labelled rounded
+  rectangle that encloses other shapes. Returns a
+  :class:`~vsdx.container.Container` proxy. Kwargs cover
+  ``title_position`` (``top-left`` / ``top`` / ``top-right`` /
+  ``bottom`` / ``banner``), ``style`` (``rounded`` / ``sharp``),
+  ``border_color`` / ``fill_color`` (hex / RGB tuple / theme-slot
+  name), ``label_style`` (``plain`` / ``banner`` / ``tab``), ``at`` /
+  ``size``, and ``auto_resize``.
+- **`Container.add_container(title, ...)`** — author a nested child
+  container inside an existing one. Reparents the child under the
+  parent's ``<Shapes>`` so the membership relationship survives
+  save/load.
+- **`Page.shapes.add_shape(..., container=ctr)`** — drop a built-in
+  autoshape directly inside *ctr*. Adds the shape at top level,
+  reparents it into the container's nested ``<Shapes>``, and
+  converts its PinX/PinY to container-local coordinates. Also
+  accepts a ``label="..."`` alias for ``text=...`` matching the
+  cloud-diagram authoring vocabulary.
+- **`Container.auto_resize`** — when ``True``, the container expands
+  to enclose its members at save time.
+  :meth:`~vsdx.container.Container.fit_to_members` is the explicit
+  hook for callers who want to drive the resize manually.
+- **`Page.containers`** — read-only list of top-level containers on
+  the page in document order. Reload dispatch routes
+  marker-cell-bearing groups to :class:`Container` automatically so
+  the metadata round-trips end to end.
+- AWS VPC fixture under
+  ``tests/unit/test_container.py::DescribeAWSVPCFixture`` builds the
+  brief's headline pattern (Production VPC > Public Subnet > ALB +
+  EC2/RDS), saves, reloads, and asserts every parent/child
+  relationship is intact post-reload.
+
 ### Added — diagram-quality lint (#134)
 
 - **`Page.lint(rules=None)`** — return a list of

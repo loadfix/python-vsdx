@@ -22,6 +22,7 @@ from vsdx.util import Inches, Length, lazyproperty
 
 if TYPE_CHECKING:
     from vsdx.connection_points import ConnectionPoint
+    from vsdx.container import Container
     from vsdx.document import VisioDocument
     from vsdx.ink import InkStroke
     from vsdx.layers import Layers
@@ -426,6 +427,116 @@ class Page(PartElementProxy):
             to_cell=target_to_cell,
         )
         return conn
+
+    # -- container shapes ----------------------------------------------
+
+    def add_container(
+        self,
+        title: Optional[str] = None,
+        title_position: str = "top-left",
+        style: str = "rounded",
+        border_color=None,
+        fill_color=None,
+        label_style: str = "plain",
+        at: "tuple[float, float]" = (1.0, 1.0),
+        size: "tuple[float, float]" = (4.0, 3.0),
+        auto_resize: bool = False,
+    ) -> "Container":
+        """Add a container shape to this page and return its proxy.
+
+        A container is a labelled rounded rectangle that encloses
+        other shapes — heavily used for AWS-VPC-style architecture
+        diagrams where logical zones (VPC, subnet, security group)
+        wrap a cluster of resources. The returned :class:`Container`
+        accepts subsequent shapes either via the ``container=`` kwarg
+        on :meth:`ShapeTree.add_shape` (top-level shapes that should
+        live inside the container) or via :meth:`Container.add_container`
+        (nested containers).
+
+        :param title: optional label rendered at *title_position*.
+        :param title_position: one of ``"top-left"``, ``"top"``,
+            ``"top-right"``, ``"bottom"``, ``"banner"``.
+        :param style: ``"rounded"`` or ``"sharp"`` outline.
+        :param border_color: hex string, ``(r, g, b)`` tuple, or a
+            theme-scheme slot name like ``"accent1"``. Theme slots
+            resolve against the document's theme at author time.
+        :param fill_color: same accepted forms as *border_color*.
+        :param label_style: ``"plain"`` / ``"banner"`` / ``"tab"``.
+        :param at: page-scoped centre-pin in inches.
+        :param size: ``(width, height)`` in inches.
+        :param auto_resize: when ``True``, the container expands to
+            fit its members at save time. See
+            :meth:`Container.fit_to_members` for the standalone hook.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.container import _author_container_into_tree
+
+        return _author_container_into_tree(
+            tree=self.shapes,
+            page=self,
+            title=title,
+            title_position=title_position,
+            style=style,
+            border_color=border_color,
+            fill_color=fill_color,
+            label_style=label_style,
+            at=at,
+            size=size,
+            auto_resize=auto_resize,
+        )
+
+    @property
+    def containers(self) -> "list[Container]":
+        """Top-level :class:`Container` shapes on this page, in document order.
+
+        Walks the page's :class:`ShapeTree` and yields one
+        :class:`Container` proxy per shape whose marker cell is set —
+        i.e. shapes authored by :meth:`add_container` and shapes
+        reloaded from a ``.vsdx`` that carries the same metadata.
+        Nested containers (those inside another container) are *not*
+        included; iterate the parent's :attr:`Container.member_shapes`
+        to find them.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.container import Container
+
+        out: list[Container] = []
+        for shape in self.shapes:
+            if isinstance(shape, Container):
+                out.append(shape)
+        return out
+
+    def _apply_container_auto_resize(self) -> None:
+        """Walk every container on the page and run :meth:`fit_to_members`
+        on those whose :attr:`auto_resize` is ``True``.
+
+        Called from :meth:`vsdx.document.VisioDocument.save` so the
+        on-disk container always wraps its current membership without
+        the caller having to track size manually.
+
+        Containers are processed innermost-first so a parent that also
+        carries ``auto_resize=True`` sees the resized children when it
+        runs its own fit pass. Children of a non-auto-resize parent
+        still resize themselves.
+        """
+        from vsdx.container import Container
+
+        # Collect containers depth-first so deepest run first.
+        ordered: list[Container] = []
+
+        def _walk(c: "Container") -> None:
+            for member in c.member_shapes:
+                if isinstance(member, Container):
+                    _walk(member)
+            ordered.append(c)
+
+        for c in self.containers:
+            _walk(c)
+        for c in ordered:
+            if c.auto_resize:
+                c.fit_to_members()
 
     # -- layers ---------------------------------------------------------
 

@@ -299,6 +299,25 @@ class VisioDocument(PartElementProxy):
         .. versionadded:: 0.3.0
            The *password* and *strict* parameters.
         """
+        # Auto-resize containers whose ``auto_resize`` flag is set, so
+        # the on-disk ``Width``/``Height`` reflect the current
+        # membership without the caller having to call
+        # :meth:`Container.fit_to_members` manually. Pages may be
+        # absent on stencil-flavoured packages (``.vssx``) so the
+        # whole pass is best-effort.
+        try:
+            pages = self.pages
+        except Exception:  # noqa: BLE001 - stencils have no pages part
+            pages = []
+        for page in pages:
+            try:
+                page._apply_container_auto_resize()
+            except Exception:  # noqa: BLE001 -- best-effort fitter
+                # A misbehaving fitter must never block a save —
+                # callers can still :meth:`fit_to_members` explicitly
+                # to surface the error.
+                pass
+
         if password is None:
             self._package.save(target, strict=strict)
             return

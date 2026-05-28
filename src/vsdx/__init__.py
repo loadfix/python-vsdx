@@ -24,6 +24,13 @@ from vsdx.connection_points import (
     ConnectionPoint,
     ConnectionPoints,
 )
+from vsdx.container import (
+    CONTAINER_LABEL_STYLES,
+    CONTAINER_STYLES,
+    CONTAINER_TITLE_POSITIONS,
+    Container,
+    ContainerMembers,
+)
 from vsdx.data_graphics import DataGraphic, DataGraphicItem, DataGraphics
 from vsdx.data_recordsets import (
     DataBinding,
@@ -130,11 +137,16 @@ __all__ = [
     "CT_VSDX_WINDOWS",
     "ArcTo",
     "CONNECTION_TYPE",
+    "CONTAINER_LABEL_STYLES",
+    "CONTAINER_STYLES",
+    "CONTAINER_TITLE_POSITIONS",
     "Cm",
     "ColorScheme",
     "ConnectionPoint",
     "ConnectionPoints",
     "Connector",
+    "Container",
+    "ContainerMembers",
     "DataBinding",
     "DataColumn",
     "DataGraphic",
