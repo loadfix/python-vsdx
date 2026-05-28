@@ -10,7 +10,7 @@ collections, and dispatches ``save`` through to the underlying
 from __future__ import annotations
 
 import io
-from typing import IO, TYPE_CHECKING, Optional, Union, cast
+from typing import IO, TYPE_CHECKING, Any, Mapping, Optional, Union, cast
 
 from vsdx.data_graphics import DataGraphics
 from vsdx.data_recordsets import DataRecordsets
@@ -245,6 +245,63 @@ class VisioDocument(PartElementProxy):
     @property
     def package(self) -> VisioPackage:
         return self._package
+
+    # -- stencil hot-swap ----------------------------------------------
+
+    def swap_stencil(
+        self,
+        from_set: "Any",
+        to_set: "Any",
+        on_missing: str = "keep-old",
+        name_map: "Optional[Mapping[str, str]]" = None,
+    ) -> "Any":
+        """Bulk-rebind every shape from one stencil set to another.
+
+        See :func:`vsdx.diagram.swap_stencil` for the full description
+        and the worked walkthrough; this method is a thin
+        delegating wrapper so the entry point lives on the document.
+
+        :returns: a :class:`~vsdx.diagram.SwapReport`.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.diagram import swap_stencil as _swap_stencil
+
+        return _swap_stencil(
+            self,
+            from_set=from_set,
+            to_set=to_set,
+            on_missing=on_missing,
+            name_map=name_map,
+        )
+
+    def swap_shapes(
+        self,
+        pattern: "Mapping[str, Any]",
+        new_master: "Any",
+    ) -> int:
+        """Surgical per-shape master swap matching *pattern*.
+
+        Thin delegating wrapper around :func:`vsdx.diagram.swap_shapes`.
+        Returns the number of shapes rebound.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.diagram import swap_shapes as _swap_shapes
+
+        return _swap_shapes(self, pattern=pattern, new_master=new_master)
+
+    def update_theme(self, theme: "Any") -> None:
+        """Replace this document's theme element with *theme*'s.
+
+        Thin delegating wrapper around :func:`vsdx.diagram.update_theme`.
+        See that function for the *theme* parameter contract.
+
+        .. versionadded:: 0.3.0
+        """
+        from vsdx.diagram import update_theme as _update_theme
+
+        _update_theme(self, theme=theme)
 
     # -- save / open ----------------------------------------------------
 

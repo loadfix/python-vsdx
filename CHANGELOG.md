@@ -45,6 +45,36 @@ populates a hyperlink from a row-bound field is **out of scope** here
 — it depends on data-graphics authoring (#118) which hasn't shipped
 and will land alongside it.
 
+### Added — stencil hot-swap (AWS-2020 -> AWS-2024 style) (#135)
+
+- **`VisioDocument.swap_stencil(from_set, to_set, on_missing, name_map=None)`**
+  — bulk-rebind every shape whose master is in *from_set* to the
+  same-named master in *to_set*. Returns a
+  :class:`~vsdx.diagram.SwapReport` carrying ``shapes_swapped`` /
+  ``shapes_kept_old`` / ``shapes_replaced_with_placeholder`` /
+  ``unmappable_properties`` / ``unmappable_shapes`` /
+  ``connector_endpoints_remapped`` counters. Shape positions
+  (``PinX`` / ``PinY`` / ``Width`` / ``Height``), text labels, and
+  custom-property values are preserved across the swap; properties
+  whose programmatic name is absent on the new master are dropped
+  and recorded on the report.
+- **`VisioDocument.swap_shapes(pattern, new_master)`** — surgical
+  per-shape swap matching ``master_name`` / ``shape_name`` /
+  ``shape_type`` keys (logical AND). Returns the count of rebound
+  shapes.
+- **`VisioDocument.update_theme(theme)`** — replace the document's
+  theme element with another :class:`~vsdx.theme.Theme`'s — bulk
+  colour / font swap without touching shape geometry.
+- **`vsdx.diagram.StencilSet`** — a name -> Master lookup with an
+  opaque ``label`` (e.g. ``"AWS-2020"``); built from a
+  :class:`VisioDocument`, a :class:`Masters` collection, or a plain
+  ``dict[str, Master]``. String labels (registry-backed lookup) are
+  reserved for the future ``python-vsdx-stencils`` package.
+- Connector glue is preserved by ``shape_id`` (``Connect/@ToSheet``),
+  and ``Connect/@ToCell`` of the form ``Connections.X<n>`` is
+  re-mapped to the nearest equivalent point on the new master by
+  Euclidean distance in the master's local frame.
+
 ### Added — container shapes for AWS-VPC-style architecture diagrams (#120)
 
 - **`Page.add_container(title, ...)`** — author a labelled rounded

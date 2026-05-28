@@ -39,6 +39,12 @@ from vsdx.data_recordsets import (
     DataRecordsets,
     DataRow,
 )
+from vsdx.diagram import (
+    StencilSet,
+    SwapReport,
+    UnmappableProperty,
+    UnmappableShape,
+)
 from vsdx.constants import (
     CT_VSDX_DRAWING_MAIN,
     CT_VSDX_MACRO_DRAWING_MAIN,
@@ -227,7 +233,11 @@ __all__ = [
     "SplineKnot",
     "SplineStart",
     "Stencil",
+    "StencilSet",
+    "SwapReport",
     "Template",
+    "UnmappableProperty",
+    "UnmappableShape",
     "TextFrame",
     "Theme",
     "Triangle",
