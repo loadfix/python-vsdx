@@ -48,6 +48,14 @@ Available kits:
   diagram dispatcher: read an ``.xlsx`` data table and delegate to
   the matching kit builder (issue #136). Wraps the builders above;
   no new diagram logic.
+* :func:`vsdx.kit.patterns.aws_three_tier` /
+  :func:`vsdx.kit.patterns.sequence_diagram` /
+  :func:`vsdx.kit.patterns.gantt_chart` /
+  :func:`vsdx.kit.patterns.mind_map` — high-level diagram patterns
+  for cloud architectures, UML sequence diagrams, project schedules,
+  and brainstorming radial maps (issue #52). The AWS pattern uses
+  container shapes (#120, Wave 5) for tier boundaries; the mind map
+  delegates to the radial layout helper (#50, Wave 8).
 
 The kit modules avoid third-party runtime deps so they remain
 import-light. The ``[kit]`` extra in ``pyproject.toml`` is reserved
@@ -128,6 +136,16 @@ from vsdx.kit.org_chart import (
     build_org_chart,
     build_org_chart_from_csv,
 )
+from vsdx.kit.patterns import (
+    AWS_TIER_APP,
+    AWS_TIER_DATA,
+    AWS_TIER_ORDER,
+    AWS_TIER_WEB,
+    aws_three_tier,
+    gantt_chart,
+    mind_map,
+    sequence_diagram,
+)
 from vsdx.kit.process import (
     PROCESS_KIND_DECISION,
     PROCESS_KIND_END,
@@ -157,6 +175,10 @@ from vsdx.kit.uml import (
 )
 
 __all__ = [
+    "AWS_TIER_APP",
+    "AWS_TIER_DATA",
+    "AWS_TIER_ORDER",
+    "AWS_TIER_WEB",
     "DEFAULT_FLOWS_SHEET",
     "DEFAULT_LANES_SHEET",
     "DEFAULT_MANAGER_COL",
@@ -222,6 +244,7 @@ __all__ = [
     "UNIT_FEET",
     "UNIT_METERS",
     "UNIT_TOKENS",
+    "aws_three_tier",
     "build_fishbone",
     "build_floor_plan",
     "build_org_chart",
@@ -232,6 +255,9 @@ __all__ = [
     "diagram_from_xlsx",
     "erd_from_models",
     "erd_from_sql",
+    "gantt_chart",
+    "mind_map",
+    "sequence_diagram",
     "uml_from_json_schema",
     "uml_from_python_module",
     "uml_from_typescript",

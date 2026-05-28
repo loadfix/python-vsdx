@@ -6,6 +6,35 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — high-level diagram pattern factories (#52)
+
+- **`vsdx.kit.patterns.aws_three_tier`** — author an AWS-style
+  three-tier reference architecture with web / app / data tiers
+  rendered as labelled containers (issue #120, Wave 5) inside a
+  region-level outer container. Each tier holds its named resources
+  as horizontally-stacked rectangles; vertical connectors glue the
+  leading resource of each tier to its downstream neighbour.
+- **`vsdx.kit.patterns.sequence_diagram`** — author a UML-style
+  sequence diagram. Actors lay out left-to-right as small header
+  boxes, drop vertical lifelines down the body, and exchange messages
+  rendered as horizontal arrows (or self-loop boxes for
+  ``sender == receiver``) stacked top-to-bottom in declaration order.
+- **`vsdx.kit.patterns.gantt_chart`** — author a horizontal-bar Gantt
+  chart on a date axis. Tasks carry ``start`` / ``end`` dates
+  (:class:`~datetime.date` instances or ISO ``YYYY-MM-DD`` strings);
+  bars span the project window proportionally and a today-line marks
+  the current date when it falls inside the project window.
+- **`vsdx.kit.patterns.mind_map`** — author a radial mind map. The
+  root concept anchors the page centre; arbitrarily-nested branches
+  fan out around it via :func:`vsdx.layout.layout` running in
+  ``"radial"`` mode (issue #50, Wave 8). Branch values may be
+  ``None`` (leaf), a sequence of sub-branch names, or a recursive
+  mapping for deeper nesting.
+- **Public re-exports** — every factory and the
+  ``AWS_TIER_*`` / ``AWS_TIER_ORDER`` constants are reachable as
+  ``vsdx.kit.aws_three_tier`` / ``sequence_diagram`` /
+  ``gantt_chart`` / ``mind_map``.
+
 <<<<<<< HEAD
 ### Added — UML class diagram template kit (#131)
 
