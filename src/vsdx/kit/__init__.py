@@ -39,6 +39,11 @@ Available kits:
   :func:`vsdx.kit.erd.erd_from_models` — entity-relationship
   diagrams authored from a SQL DDL file or a programmatic
   ``{table: {columns: [...]}}`` mapping (issue #130).
+* :func:`vsdx.kit.uml.uml_from_python_module` /
+  :func:`vsdx.kit.uml.uml_from_json_schema` /
+  :func:`vsdx.kit.uml.uml_from_typescript` — UML class diagrams
+  authored by introspecting a Python module, walking a JSON Schema
+  document, or regex-parsing TypeScript source (issue #131).
 
 The kit modules avoid third-party runtime deps so they remain
 import-light. The ``[kit]`` extra in ``pyproject.toml`` is reserved
@@ -104,12 +109,21 @@ from vsdx.kit.process import (
     build_sipoc,
 )
 from vsdx.kit.swim_lanes import (
-    SWIM_LANE_STEP_KINDS,
     SWIM_LANE_KIND_DECISION,
     SWIM_LANE_KIND_DEFAULT,
     SWIM_LANE_KIND_END,
     SWIM_LANE_KIND_START,
+    SWIM_LANE_STEP_KINDS,
     build_swim_lane_diagram,
+)
+from vsdx.kit.uml import (
+    UML_RELATION_ASSOCIATION,
+    UML_RELATION_COMPOSITION,
+    UML_RELATION_INHERITANCE,
+    UML_RELATIONS,
+    uml_from_json_schema,
+    uml_from_python_module,
+    uml_from_typescript,
 )
 
 __all__ = [
@@ -148,6 +162,10 @@ __all__ = [
     "SWIM_LANE_KIND_END",
     "SWIM_LANE_KIND_START",
     "SWIM_LANE_STEP_KINDS",
+    "UML_RELATIONS",
+    "UML_RELATION_ASSOCIATION",
+    "UML_RELATION_COMPOSITION",
+    "UML_RELATION_INHERITANCE",
     "UNIT_FEET",
     "UNIT_METERS",
     "UNIT_TOKENS",
@@ -160,4 +178,7 @@ __all__ = [
     "build_swim_lane_diagram",
     "erd_from_models",
     "erd_from_sql",
+    "uml_from_json_schema",
+    "uml_from_python_module",
+    "uml_from_typescript",
 ]

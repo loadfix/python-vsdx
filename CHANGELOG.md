@@ -6,6 +6,38 @@ the project uses a CalVer-ish `0.MAJOR.MINOR` scheme until 1.0.
 
 ## [Unreleased]
 
+### Added — UML class diagram template kit (#131)
+
+- **`vsdx.kit.uml.uml_from_python_module`** — author a UML class
+  diagram by introspecting a real Python module via :mod:`importlib`
+  + :mod:`inspect` + :func:`typing.get_type_hints`. Each top-level
+  class declared in the module renders as a three-section UML
+  rectangle (name | attributes | methods); ``cls.__bases__`` drive
+  inheritance arrows and typed attributes whose target lives in the
+  same module emit composition connectors.
+- **`vsdx.kit.uml.uml_from_json_schema`** — walk a JSON Schema
+  document (``draft-07`` flavour) and turn each ``definitions`` /
+  ``$defs`` entry plus a titled root into a class box. ``$ref``
+  property values become composition edges; ``allOf`` ``$ref`` items
+  become inheritance edges. Accepts a path, a path-shaped string, an
+  inline JSON string, or a parsed ``Mapping``.
+- **`vsdx.kit.uml.uml_from_typescript`** — best-effort regex parser
+  for ``interface X { ... }``, ``class X extends Y implements Z
+  { ... }``, and ``type X = { ... }`` block forms. Comments and
+  string literals are scrubbed before parsing so embedded braces
+  don't fool the block matcher; generic parameters are tolerated but
+  stripped from the rendered name.
+- **Connector metadata** — every emitted connector carries shape data
+  ``Relationship`` (one of :data:`UML_RELATION_INHERITANCE`,
+  :data:`UML_RELATION_COMPOSITION`, :data:`UML_RELATION_ASSOCIATION`)
+  plus ``Source`` / ``Target`` so a downstream pass can swap the
+  bundled simple arrow for hollow-triangle / filled-diamond glyphs
+  without re-parsing the source.
+- **Public re-exports** — the three builders + the relationship
+  constants are reachable as ``vsdx.kit.uml_from_python_module`` /
+  ``vsdx.kit.uml_from_json_schema`` / ``vsdx.kit.uml_from_typescript``
+  / ``vsdx.kit.UML_RELATIONS``.
+
 ### Added — floor-plan template kit (#127)
 
 - **`vsdx.kit.floor_plan.build_floor_plan`** — author an office /
