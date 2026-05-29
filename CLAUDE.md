@@ -221,6 +221,19 @@ Expected fixtures are listed in
 - `# pyright: …` pragmas at the top of every CT_* module (copy the
   set from `ooxml_chart.oxml.shared`).
 
+### Keep FEATURES.md current
+
+Whenever a feature is added, removed, or a public option changes,
+update `FEATURES.md` *in the same PR* as the code change. The file
+is the canonical public-API catalogue: every public callable has its
+own section with a signature, one-line description, and a runnable
+snippet. Add the new entry (or update / remove the existing one),
+refresh the snippet, and verify it runs against a fresh
+`vsdx.Visio()`. This is the file a human or LLM consults to answer
+"what methods can I call?" — keep it accurate. If the change
+introduces a new capability category (e.g. a new diagram-import
+format), also update `../docs/api/index.md` and `../README.md`.
+
 ## OOXML spec vs Microsoft reality
 
 - Visio desktop is the reference. When MS Learn docs disagree with
